@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { Card, Row, Col, Badge, Button, Form, Alert, ProgressBar } from 'react-bootstrap';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart, registerables } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 import { Line, Bar } from 'react-chartjs-2';
+import { CSVLink } from 'react-csv';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { ApiService } from '../services/ApiService';
 import { useAccessibility } from '../utils/AccessibilityManager';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+// Register Chart.js components
+Chart.register(...registerables);
 
 export const AnalyticsManager = () => {
     const { announce } = useAccessibility();
@@ -66,17 +72,64 @@ export const AnalyticsManager = () => {
         announce(`Refresh interval set to ${interval} seconds`);
     };
 
-    const exportAnalytics = async (format) => {
+    const exportAnalytics = (format) => {
         try {
-            const blob = await ApiService.exportAnalytics(format, timeRange);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `analytics_${timeRange}.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            if (format === 'json') {
+                const dataStr = JSON.stringify(analytics, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `analytics_${timeRange}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else if (format === 'pdf') {
+                const doc = new jsPDF();
+                doc.text('Analytics Report', 14, 16);
+                
+                // Add performance metrics
+                doc.addPage();
+                doc.text('Performance Metrics', 14, 16);
+                doc.autoTable({
+                    startY: 20,
+                    head: [['Timestamp', 'CPU Usage (%)', 'Memory Usage (%)', 'Network I/O (MB/s)']],
+                    body: analytics.performance?.timestamps?.map((timestamp, index) => [
+                        new Date(timestamp).toLocaleString(),
+                        analytics.performance.cpu?.[index] || 'N/A',
+                        analytics.performance.memory?.[index] || 'N/A',
+                        analytics.performance.network?.[index] || 'N/A'
+                    ]) || []
+                });
+
+                // Add usage statistics
+                doc.addPage();
+                doc.text('Usage Statistics', 14, 16);
+                doc.autoTable({
+                    startY: 20,
+                    head: [['Feature', 'Usage Count']],
+                    body: Object.entries(analytics.usage || {}).map(([key, value]) => [key, value])
+                });
+
+                // Add recent errors
+                if (analytics.errors && analytics.errors.length > 0) {
+                    doc.addPage();
+                    doc.text('Recent Errors', 14, 16);
+                    doc.autoTable({
+                        startY: 20,
+                        head: [['Timestamp', 'Message', 'Source', 'Severity']],
+                        body: analytics.errors.map(error => [
+                            new Date(error.timestamp).toLocaleString(),
+                            error.message || 'Unknown error',
+                            error.source || 'Unknown',
+                            error.severity || 'Medium'
+                        ])
+                    });
+                }
+
+                doc.save(`analytics_${timeRange}.pdf`);
+            }
             announce(`Analytics exported as ${format}`);
         } catch (error) {
             console.error('Export failed:', error);
@@ -307,12 +360,14 @@ export const AnalyticsManager = () => {
                                             </button>
                                         </li>
                                         <li>
-                                            <button
+                                            <CSVLink
+                                                data={analytics.errors || []}
+                                                filename={`analytics_errors_${timeRange}.csv`}
                                                 className="dropdown-item"
-                                                onClick={() => exportAnalytics('csv')}
+                                                onClick={() => announce('CSV export started')}
                                             >
-                                                CSV
-                                            </button>
+                                                CSV (Errors)
+                                            </CSVLink>
                                         </li>
                                         <li>
                                             <button
@@ -554,6 +609,16 @@ export const AnalyticsManager = () => {
             </Card>
         </div>
     );
+};
+
+AnalyticsManager.propTypes = {
+    defaultTimeRange: PropTypes.oneOf(['1h', '24h', '7d', '30d']),
+    autoRefreshEnabled: PropTypes.bool
+};
+
+AnalyticsManager.defaultProps = {
+    defaultTimeRange: '24h',
+    autoRefreshEnabled: true
 };
 
 export default AnalyticsManager;
