@@ -1,0 +1,195 @@
+# Home Assistant Addon Docker Compose for AICleaner v3
+# Specialized configuration for Home Assistant OS and Supervisor integration
+
+version: '3.8'
+
+services:
+  # Ollama service optimized for Home Assistant environment
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: aicleaner-ollama-ha
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      # Use Home Assistant addon data structure
+      - /data/ollama_models:/data/models
+      - /config/aicleaner/scripts:/scripts:ro
+      - /config/aicleaner/ollama:/config:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_MAX_LOADED_MODELS=2
+    networks:
+      - hassio
+    labels:
+      - "io.hass.name=AICleaner Ollama"
+      - "io.hass.description=Local LLM service for AICleaner"
+      - "io.hass.arch=amd64|aarch64"
+      - "io.hass.type=addon"
+    healthcheck:
+      test: ["/scripts/health-check.sh", "quick"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 180s
+
+  # AICleaner main application for Home Assistant
+  aicleaner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_FROM: homeassistant/amd64-base:latest
+    container_name: aicleaner-app-ha
+    restart: always
+    ports:
+      - "8099:8099"
+    volumes:
+      # Home Assistant addon volume structure
+      - /data/aicleaner:/data
+      - /config/aicleaner:/config
+      - /share/aicleaner:/share
+      - /ssl:/ssl:ro
+      
+      # Configuration files
+      - /config/aicleaner/config.yaml:/app/config.yaml:ro
+      - /config/aicleaner/options.json:/app/options.json:ro
+    environment:
+      # Ollama Configuration
+      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      
+      # AICleaner Configuration
+      - AICLEANER_DATA_PATH=/data
+      - AICLEANER_LOG_LEVEL=INFO
+      - AICLEANER_PRIVACY_LEVEL=standard
+      - AICLEANER_ENVIRONMENT=homeassistant
+      
+      # Home Assistant Integration
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
+      - HA_TOKEN=${HA_TOKEN}
+      - HA_URL=http://supervisor/core
+      
+      # Home Assistant Supervisor API
+      - HASSIO_TOKEN=${HASSIO_TOKEN}
+      - HASSIO_API=http://supervisor
+      
+      # Performance Settings for HA environment
+      - MAX_MEMORY_USAGE=2048
+      - MAX_CPU_USAGE=60
+      - QUANTIZATION_LEVEL=4
+      
+      # Home Assistant specific
+      - TZ=${TZ:-UTC}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - hassio
+    labels:
+      - "io.hass.name=AICleaner v3"
+      - "io.hass.description=AI-powered cleaning task management"
+      - "io.hass.arch=amd64|aarch64"
+      - "io.hass.type=addon"
+      - "io.hass.version=3.0.0"
+      - "io.hass.stage=stable"
+      - "io.hass.url=https://github.com/yourusername/aicleaner"
+      - "io.hass.codenotary=notary@home-assistant.io"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Home Assistant integration helper (optional)
+  ha-integration:
+    image: homeassistant/amd64-base:latest
+    container_name: aicleaner-ha-integration
+    restart: unless-stopped
+    volumes:
+      - /config/aicleaner:/config
+      - /share/aicleaner:/share
+      - ./scripts/ha-integration.sh:/usr/local/bin/ha-integration.sh:ro
+    environment:
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
+      - HA_TOKEN=${HA_TOKEN}
+    networks:
+      - hassio
+    command: ["/usr/local/bin/ha-integration.sh"]
+    profiles:
+      - integration
+    labels:
+      - "io.hass.name=AICleaner Integration Helper"
+      - "io.hass.description=Home Assistant integration utilities"
+      - "io.hass.type=addon"
+
+# Home Assistant networks
+networks:
+  hassio:
+    external: true
+    name: hassio
+
+# Home Assistant addon configuration
+x-addon-config: &addon-config
+  name: "AICleaner v3"
+  version: "3.0.0"
+  slug: "aicleaner_v3"
+  description: "AI-powered cleaning task management with local LLM support"
+  url: "https://github.com/yourusername/aicleaner"
+  arch:
+    - amd64
+    - aarch64
+  startup: application
+  boot: auto
+  init: false
+  hassio_api: true
+  homeassistant_api: true
+  host_network: false
+  privileged: false
+  full_access: false
+  apparmor: true
+  ingress: true
+  ingress_port: 8099
+  panel_icon: "mdi:robot-vacuum"
+  panel_title: "AI Cleaner"
+  map:
+    - "config:rw"
+    - "share:rw"
+    - "ssl:ro"
+  options:
+    display_name: "AI Cleaner"
+    gemini_api_key: ""
+    ollama_enabled: true
+    ollama_host: "ollama:11434"
+    privacy_level: "standard"
+    zones: []
+  schema:
+    display_name: "str"
+    gemini_api_key: "str?"
+    ollama_enabled: "bool"
+    ollama_host: "str"
+    privacy_level: "list(strict|standard|relaxed)"
+    mqtt_enabled: "bool?"
+    mqtt_host: "str?"
+    mqtt_port: "int?"
+    mqtt_username: "str?"
+    mqtt_password: "password?"
+    zones:
+      - name: "str"
+        camera_entity: "str"
+        todo_list_entity: "str?"
+        purpose: "str?"
+        interval_minutes: "int?"
+        specific_times: ["str?"]
+        random_offset_minutes: "int?"
+        ignore_rules: ["str?"]
+  services:
+    - "mqtt:want"
+  image: "ghcr.io/yourusername/aicleaner-{arch}"

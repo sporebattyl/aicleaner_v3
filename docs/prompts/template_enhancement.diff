@@ -1,0 +1,57 @@
+```diff
+--- ENHANCED_CONSENSUS_TEMPLATE_90PLUS.md (current)
++++ ENHANCED_CONSENSUS_TEMPLATE_98PLUS.md (proposed)
+@@ -28,6 +28,13 @@
+ - **Integration Points**: [HA API, MQTT, external service touchpoints]
+ - **Component Contracts**: [API interfaces between components with stability requirements]
+ - **Testing Strategy**: [Unit, integration, and system test requirements with AAA examples]
++
++### Dependency & Data Contracts
++- **Internal Dependencies**: [List of other internal components/modules this task depends on]
++- **External Dependencies**: [List of external libraries, APIs, or services]
++- **Data Contracts (Inputs)**: [Structured definition of expected input data, including format, schema, and validation rules]
++- **Data Contracts (Outputs)**: [Structured definition of output data, including format and schema]
++
+ 
+ ### Security Considerations
+ - **Input Validation**: [Specific validation requirements for user inputs]
+@@ -35,6 +42,11 @@
+ - **Data Protection**: [User data handling and storage security]
+ - **HA Security Compliance**: [Link to specific HA security documentation sections]
+ 
++### Continuous Security Considerations
++- **Threat Modeling**: [Brief description of potential threats and attack vectors relevant to this task]
++- **Secure Coding Practices**: [Checklist of specific secure coding standards to follow (e.g., OWASP Top 10)]
++- **Dependency Vulnerability Scans**: [Requirement to scan dependencies for known vulnerabilities]
++
+ ## 3. Implementation Validation Framework
+ 
+ ### Self-Assessment Checklist (5-7 Items)
+@@ -53,6 +65,12 @@
+ - **Measurement Strategy**: [How to establish performance baselines for this phase]
+ - **Acceptable Ranges**: [Guidelines for determining acceptable performance]
+ - **Monitoring Setup**: [What metrics to track during development]
++
++### Success Metrics & Performance Baselines
++- **Key Performance Indicators (KPIs)**: [List of 2-3 measurable KPIs to track success (e.g., processing time, error rate)]
++- **Performance Baselines**: [Specific, measurable baseline values for each KPI]
++- **Benchmarking Strategy**: [How to measure and compare performance against baselines]
++
+ 
+ ## 4. Quality Assurance
+ 
+@@ -71,6 +89,11 @@
+ - [ ] Loose coupling achieved with measurable component independence]
+ - [ ] High cohesion within components with focused functionality]
+ 
++### Developer Experience & Maintainability
++- **Code Readability**: [Is the code clear, well-commented, and easy to understand?]
++- **Testability**: [Are the components and logic easily testable in isolation?]
++- **Configuration Simplicity**: [Is the configuration straightforward and well-documented?]
++- **Extensibility**: [Can new features or integrations be added with minimal refactoring?]
++
+ ### Risk Mitigation Validation
+ - **High Risk Scenarios**: [Specific high-risk scenarios and validation tests]
+ - **Rollback Validation**: [Test scenarios for rollback procedures]
+
+```

@@ -1,0 +1,61 @@
+configuration:
+  gemini_api_key:
+    name: "Gemini API Key"
+    description: "Your Google Gemini API key for AI-powered analysis"
+  display_name:
+    name: "Display Name"
+    description: "Name to display in notifications and logs"
+  enable_mqtt:
+    name: "Enable MQTT"
+    description: "Enable MQTT integration for Home Assistant entity discovery"
+  mqtt_broker_host:
+    name: "MQTT Broker Host"
+    description: "IP address or hostname of your MQTT broker"
+  mqtt_broker_port:
+    name: "MQTT Broker Port"
+    description: "Port number for MQTT broker connection"
+  mqtt_username:
+    name: "MQTT Username"
+    description: "Username for MQTT broker authentication (optional)"
+  mqtt_password:
+    name: "MQTT Password"
+    description: "Password for MQTT broker authentication (optional)"
+  zones:
+    name: "Cleaning Zones"
+    description: "Configure areas for AI-powered cleanliness monitoring"
+  zones.name:
+    name: "Zone Name"
+    description: "Descriptive name for this cleaning zone"
+  zones.camera_entity:
+    name: "Camera Entity"
+    description: "Home Assistant camera entity ID (e.g., camera.kitchen)"
+  zones.todo_list_entity:
+    name: "Todo List Entity"
+    description: "Home Assistant todo list entity ID (e.g., todo.kitchen_tasks)"
+  zones.update_frequency:
+    name: "Update Frequency (hours)"
+    description: "How often to analyze this zone (1-24 hours)"
+  zones.icon:
+    name: "Zone Icon"
+    description: "Material Design Icon (e.g., mdi:bed) - optional"
+  zones.purpose:
+    name: "Zone Purpose"
+    description: "Primary function of this zone - optional"
+  zones.notifications_enabled:
+    name: "Enable Notifications"
+    description: "Send notifications for this zone - optional"
+  zones.notification_service:
+    name: "Notification Service"
+    description: "Home Assistant notification service - optional"
+  zones.notification_personality:
+    name: "Notification Personality"
+    description: "AI personality: default, snarky, jarvis, roaster, butler, coach, zen - optional"
+  zones.notify_on_create:
+    name: "Notify on Task Creation"
+    description: "Send notification when tasks are created - optional"
+  zones.notify_on_complete:
+    name: "Notify on Task Completion"
+    description: "Send notification when tasks are completed - optional"
+
+network:
+  8099/tcp: "Web interface port for configuration and monitoring"

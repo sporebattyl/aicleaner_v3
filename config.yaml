@@ -1,0 +1,46 @@
+name: "AICleaner v3.6"
+version: "10.2.0"
+slug: "aicleaner_v3"
+description: "Intelligent multi-zone cleanliness management with frontend integration"
+arch:
+  - amd64
+startup: "application"
+boot: "auto"
+init: false
+homeassistant_api: true
+hassio_api: true
+ports:
+  8099/tcp: 8099
+
+# Default options
+options:
+  gemini_api_key: ""
+  display_name: "My Family"
+  enable_mqtt: false
+  mqtt_broker_host: "localhost"
+  mqtt_broker_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  zones: []
+
+# Complete schema for validation - NOW INCLUDES ALL REQUIRED FIELDS
+schema:
+  gemini_api_key: str
+  display_name: str
+  enable_mqtt: bool
+  mqtt_broker_host: str
+  mqtt_broker_port: port
+  mqtt_username: str
+  mqtt_password: password
+  zones:
+    - name: str
+      camera_entity: str
+      todo_list_entity: str
+      update_frequency: "int(1,24)"
+      icon: str?
+      purpose: str?
+      notifications_enabled: bool?
+      notification_service: str?
+      notification_personality: str?
+      notify_on_create: bool?
+      notify_on_complete: bool?

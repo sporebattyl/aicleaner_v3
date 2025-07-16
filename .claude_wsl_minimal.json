@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/drewcifer/aicleaner_v3"]
+    },
+    "git": {
+      "command": "npx", 
+      "args": ["-y", "@cyanheads/git-mcp-server"]
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "brave-search-mcp"],
+      "env": {
+        "BRAVE_API_KEY": "BSA0Iv5TiOTlCHrCSha2hkoo6PkiA7o"
+      }
+    }
+  }
+}

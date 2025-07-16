@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/mnt/c/users/dmjtx/aicleaner_v3"]
+    },
+    "git": {
+      "command": "npx", 
+      "args": ["-y", "@cyanheads/git-mcp-server"]
+    }
+  }
+}
