@@ -7,14 +7,12 @@ load balancing, failover, and performance optimization.
 """
 
 import asyncio
-import json
 import logging
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
-import random
 
 from .base_provider import (
     BaseAIProvider, AIProviderConfiguration, AIRequest, AIResponse,
@@ -24,18 +22,14 @@ from .openai_provider import OpenAIProvider
 from .anthropic_provider import AnthropicProvider
 from .google_provider import GoogleProvider
 from .ollama_provider import OllamaProvider
+from .llamacpp_amd_provider import LlamaCppAMDProvider
 from .credential_manager import CredentialManager
-from .health_monitor import HealthMonitor, HealthReport
+from .health_monitor import HealthMonitor
 
 
 class ProviderSelectionStrategy(Enum):
     """Provider selection strategies"""
-    ROUND_ROBIN = "round_robin"
-    LEAST_LOADED = "least_loaded"
-    FASTEST_RESPONSE = "fastest_response"
-    COST_OPTIMAL = "cost_optimal"
     PRIORITY_BASED = "priority_based"
-    ADAPTIVE = "adaptive"
 
 
 @dataclass
@@ -50,40 +44,30 @@ class ProviderConfig:
     config: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class RoutingRule:
-    """Routing rule for requests"""
-    condition: str
-    provider: str
-    priority: int = 1
-    enabled: bool = True
-
-
 class AIProviderManager:
     """
-    Central AI Provider Manager with intelligent routing and management.
+    Central AI Provider Manager with priority-based routing and management.
+    Simplified for single-user context.
     
     Features:
     - Multi-provider support with unified interface
-    - Intelligent request routing and load balancing
+    - Priority-based provider selection
     - Automated failover and error recovery
-    - Performance monitoring and optimization
-    - Cost tracking and budget management
     - Credential management integration
-    - Health monitoring and alerting
-    - Request batching and optimization
     """
     
-    def __init__(self, config: Dict[str, Any], data_path: str = "/data"):
+    def __init__(self, config: Dict[str, Any], data_path: str = "/data", hass=None):
         """
         Initialize AI Provider Manager.
         
         Args:
             config: Configuration dictionary
             data_path: Path for storing data
+            hass: Home Assistant instance for notifications
         """
         self.config = config
         self.data_path = data_path
+        self.hass = hass
         self.logger = logging.getLogger("ai_provider_manager")
         
         # Provider management
@@ -93,19 +77,15 @@ class AIProviderManager:
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
             "google": GoogleProvider,
-            "ollama": OllamaProvider
+            "ollama": OllamaProvider,
+            "llamacpp_amd": LlamaCppAMDProvider
         }
         
-        # Routing and load balancing
-        self.selection_strategy = ProviderSelectionStrategy(
-            config.get("selection_strategy", "adaptive")
-        )
-        self.routing_rules: List[RoutingRule] = []
-        self.round_robin_index = 0
+        # Simplified routing - priority-based only
+        self.selection_strategy = ProviderSelectionStrategy.PRIORITY_BASED
         
         # Performance tracking
         self.request_history: List[Dict[str, Any]] = []
-        self.provider_performance: Dict[str, Dict[str, float]] = {}
         
         # Credential management
         self.credential_manager = CredentialManager(config, data_path)
@@ -113,27 +93,9 @@ class AIProviderManager:
         # Health monitoring
         self.health_monitor = HealthMonitor("ai_provider_manager", config)
         
-        # Request queue and batching
-        self.request_queue: asyncio.Queue = asyncio.Queue()
-        self.batch_size = config.get("batch_size", 5)
-        self.batch_timeout = config.get("batch_timeout", 1.0)
-        
         # Circuit breaker state
         self.circuit_breakers: Dict[str, Dict[str, Any]] = {}
         
-        # Caching
-        self.cache: Dict[str, Any] = {}
-        self.cache_ttl = config.get("cache_ttl", 300)
-        
-        # Statistics
-        self.stats = {
-            "total_requests": 0,
-            "successful_requests": 0,
-            "failed_requests": 0,
-            "total_cost": 0.0,
-            "provider_usage": {},
-            "average_response_time": 0.0
-        }
         
         # Load provider configurations during initialization
         self._load_provider_configs()
@@ -151,9 +113,6 @@ class AIProviderManager:
             
             # Start health monitoring
             await self.health_monitor.start_monitoring()
-            
-            # Start request processing
-            asyncio.create_task(self._process_request_queue())
             
             self.logger.info(f"AI Provider Manager initialized with {len(self.providers)} providers")
             return True
@@ -219,24 +178,15 @@ class AIProviderManager:
                     self.providers[provider_name] = provider
                     self.logger.info(f"Successfully initialized provider: {provider_name}")
                     
-                    # Initialize circuit breaker
+                    # Initialize circuit breaker with faster recovery
                     self.circuit_breakers[provider_name] = {
                         "state": "closed",
                         "failure_count": 0,
                         "last_failure": None,
-                        "timeout": 60  # seconds
+                        "timeout": 30,  # Faster recovery: 30 seconds
+                        "max_failures": 3  # Faster circuit opening: 3 failures
                     }
                     
-                    # Initialize performance tracking
-                    self.provider_performance[provider_name] = {
-                        "response_time": 0.0,
-                        "success_rate": 1.0,
-                        "cost_per_request": 0.0,
-                        "load": 0.0
-                    }
-                    
-                    # Initialize stats
-                    self.stats["provider_usage"][provider_name] = 0
                     
                 else:
                     self.logger.error(f"Failed to initialize provider: {provider_name}")
@@ -257,13 +207,6 @@ class AIProviderManager:
         start_time = time.time()
         
         try:
-            # Check cache first
-            cache_key = self._generate_cache_key(request)
-            cached_response = self._get_cached_response(cache_key)
-            if cached_response:
-                self.logger.debug(f"Cache hit for request: {request.request_id}")
-                return cached_response
-            
             # Select provider
             provider = await self._select_provider(request)
             if not provider:
@@ -277,19 +220,10 @@ class AIProviderManager:
             # Process request
             response = await self._process_with_provider(provider, request)
             
-            # Cache response
-            self._cache_response(cache_key, response)
-            
-            # Update statistics
-            self._update_stats(provider.config.name, response, time.time() - start_time)
-            
             return response
             
         except Exception as e:
             self.logger.error(f"Error processing request {request.request_id}: {e}")
-            
-            # Update failure statistics
-            self.stats["failed_requests"] += 1
             
             # Return error response
             return AIResponse(
@@ -304,31 +238,60 @@ class AIProviderManager:
             )
     
     async def _select_provider(self, request: AIRequest) -> Optional[BaseAIProvider]:
-        """Select the best provider for the request"""
+        """Select the best provider for the request with enhanced routing logic"""
         available_providers = self._get_available_providers()
         
         if not available_providers:
             return None
         
-        # Apply routing rules first
-        for rule in self.routing_rules:
-            if rule.enabled and self._matches_routing_rule(request, rule):
-                if rule.provider in available_providers:
-                    return self.providers[rule.provider]
+        # Enhanced routing logic
         
-        # Use selection strategy
-        if self.selection_strategy == ProviderSelectionStrategy.ROUND_ROBIN:
-            return self._select_round_robin(available_providers)
-        elif self.selection_strategy == ProviderSelectionStrategy.LEAST_LOADED:
-            return self._select_least_loaded(available_providers)
-        elif self.selection_strategy == ProviderSelectionStrategy.FASTEST_RESPONSE:
-            return self._select_fastest_response(available_providers)
-        elif self.selection_strategy == ProviderSelectionStrategy.COST_OPTIMAL:
-            return self._select_cost_optimal(available_providers)
-        elif self.selection_strategy == ProviderSelectionStrategy.PRIORITY_BASED:
-            return self._select_priority_based(available_providers)
-        else:  # ADAPTIVE
-            return self._select_adaptive(available_providers)
+        # 1. Privacy-first routing - prefer local providers for sensitive requests
+        privacy_mode = request.context and request.context.get("privacy_mode", False)
+        if privacy_mode:
+            local_providers = [p for p in available_providers if p in ["ollama", "llamacpp_amd"]]
+            if local_providers:
+                self.logger.info("Privacy mode enabled - using local providers only")
+                available_providers = local_providers
+        
+        # 2. Vision request routing with local preference
+        if request.image_path or request.image_data:
+            # Check if local vision models are available first
+            local_vision_providers = [p for p in available_providers if p == "llamacpp_amd" and 
+                                    self.providers[p].capabilities.get("vision", False)]
+            
+            if local_vision_providers:
+                # Prefer local vision models for privacy and cost
+                available_providers = local_vision_providers
+                self.logger.info("Using local vision model for image analysis")
+            else:
+                # Fallback to cloud vision providers
+                cloud_vision_providers = [p for p in available_providers if p in ["google", "openai"]]
+                if cloud_vision_providers:
+                    available_providers = cloud_vision_providers
+                    self.logger.info("Falling back to cloud vision providers")
+        
+        # 3. Performance-based local preference for text-only requests
+        elif not (request.image_path or request.image_data):
+            # For text-only requests, prefer local providers if they meet performance requirements
+            local_providers = [p for p in available_providers if p in ["llamacpp_amd", "ollama"]]
+            
+            # Check if local providers can handle the request efficiently
+            if local_providers and not self._is_complex_request(request):
+                # Use local providers for simple to moderate complexity requests
+                available_providers = local_providers
+                self.logger.debug("Using local providers for text-only request")
+        
+        # 4. Code generation preference
+        if self._is_code_request(request.prompt):
+            # Prefer providers with strong code generation capabilities
+            code_providers = [p for p in available_providers if 
+                            self.providers[p].capabilities.get("code_generation", False)]
+            if code_providers:
+                available_providers = code_providers
+        
+        # Use enhanced priority-based selection
+        return self._select_priority_based_enhanced(available_providers, request)
     
     def _get_available_providers(self) -> List[str]:
         """Get list of available providers"""
@@ -345,71 +308,6 @@ class AIProviderManager:
         
         return available
     
-    def _select_round_robin(self, available_providers: List[str]) -> BaseAIProvider:
-        """Select provider using round-robin strategy"""
-        if not available_providers:
-            return None
-        
-        provider_name = available_providers[self.round_robin_index % len(available_providers)]
-        self.round_robin_index += 1
-        
-        return self.providers[provider_name]
-    
-    def _select_least_loaded(self, available_providers: List[str]) -> BaseAIProvider:
-        """Select provider with least load"""
-        if not available_providers:
-            return None
-        
-        best_provider = None
-        min_load = float('inf')
-        
-        for provider_name in available_providers:
-            provider = self.providers[provider_name]
-            load = provider.get_active_requests()
-            
-            if load < min_load:
-                min_load = load
-                best_provider = provider
-        
-        return best_provider
-    
-    def _select_fastest_response(self, available_providers: List[str]) -> BaseAIProvider:
-        """Select provider with fastest response time"""
-        if not available_providers:
-            return None
-        
-        best_provider = None
-        min_response_time = float('inf')
-        
-        for provider_name in available_providers:
-            provider = self.providers[provider_name]
-            response_time = provider.get_metrics().average_response_time
-            
-            if response_time < min_response_time:
-                min_response_time = response_time
-                best_provider = provider
-        
-        return best_provider
-    
-    def _select_cost_optimal(self, available_providers: List[str]) -> BaseAIProvider:
-        """Select provider with optimal cost"""
-        if not available_providers:
-            return None
-        
-        best_provider = None
-        min_cost = float('inf')
-        
-        for provider_name in available_providers:
-            provider = self.providers[provider_name]
-            metrics = provider.get_metrics()
-            cost_per_request = metrics.total_cost / max(1, metrics.total_requests)
-            
-            if cost_per_request < min_cost:
-                min_cost = cost_per_request
-                best_provider = provider
-        
-        return best_provider
-    
     def _select_priority_based(self, available_providers: List[str]) -> BaseAIProvider:
         """Select provider based on priority"""
         if not available_providers:
@@ -423,37 +321,78 @@ class AIProviderManager:
         
         return self.providers[sorted_providers[0]]
     
-    def _select_adaptive(self, available_providers: List[str]) -> BaseAIProvider:
-        """Select provider using adaptive strategy"""
+    def _select_priority_based_enhanced(self, available_providers: List[str], request: AIRequest) -> BaseAIProvider:
+        """Enhanced priority-based selection with request context consideration"""
         if not available_providers:
             return None
         
-        # Calculate scores for each provider
-        scores = {}
+        # Sort by priority but also consider provider capabilities and performance
+        provider_scores = []
         
         for provider_name in available_providers:
+            if provider_name not in self.provider_configs:
+                continue
+                
             provider = self.providers[provider_name]
             config = self.provider_configs[provider_name]
-            metrics = provider.get_metrics()
             
-            # Calculate weighted score
-            response_time_score = 1.0 / max(0.1, metrics.average_response_time)
-            success_rate_score = metrics.success_rate
-            cost_score = 1.0 / max(0.01, metrics.total_cost / max(1, metrics.total_requests))
-            load_score = 1.0 / max(1, provider.get_active_requests())
+            # Base priority score (lower priority number = higher score)
+            priority_score = 10.0 / max(config.priority, 1)
             
-            score = (
-                response_time_score * 0.3 +
-                success_rate_score * 0.3 +
-                cost_score * 0.2 +
-                load_score * 0.2
-            ) * config.weight
+            # Performance bonus for local providers (no network latency)
+            performance_bonus = 2.0 if provider_name in ["llamacpp_amd", "ollama"] else 0.0
             
-            scores[provider_name] = score
+            # Capability matching bonus
+            capability_bonus = 0.0
+            if request.image_path or request.image_data:
+                if provider.capabilities.get("vision", False):
+                    capability_bonus += 3.0
+            
+            if self._is_code_request(request.prompt):
+                if provider.capabilities.get("code_generation", False):
+                    capability_bonus += 1.5
+            
+            # Health and availability bonus
+            health_bonus = 2.0 if provider.is_healthy() else 0.0
+            
+            total_score = priority_score + performance_bonus + capability_bonus + health_bonus
+            provider_scores.append((provider_name, total_score))
         
         # Select provider with highest score
-        best_provider = max(scores, key=scores.get)
-        return self.providers[best_provider]
+        provider_scores.sort(key=lambda x: x[1], reverse=True)
+        selected_provider = provider_scores[0][0]
+        
+        self.logger.debug(f"Enhanced provider selection: {selected_provider} "
+                         f"(score: {provider_scores[0][1]:.1f})")
+        
+        return self.providers[selected_provider]
+    
+    def _is_complex_request(self, request: AIRequest) -> bool:
+        """
+        Determine if a request is complex and might benefit from cloud providers.
+        
+        Args:
+            request: AI request to analyze
+            
+        Returns:
+            True if request appears complex
+        """
+        prompt = request.prompt.lower()
+        
+        # Indicators of complex requests that might benefit from cloud providers
+        complex_indicators = [
+            "analyze", "research", "comprehensive", "detailed analysis",
+            "compare and contrast", "in-depth", "thorough examination",
+            "professional report", "academic", "scientific", "technical specification",
+            "multi-step", "complex problem", "advanced", "sophisticated"
+        ]
+        
+        # Long prompts might be complex
+        if len(request.prompt) > 1000:
+            return True
+        
+        # Check for complex task indicators
+        return any(indicator in prompt for indicator in complex_indicators)
     
     async def _process_with_provider(self, provider: BaseAIProvider, 
                                   request: AIRequest) -> AIResponse:
@@ -472,15 +411,15 @@ class AIProviderManager:
             
             # Try fallback if available
             if e.retryable:
-                fallback_provider = await self._get_fallback_provider(provider.config.name)
+                fallback_provider = await self._get_fallback_provider(provider.config.name, request)
                 if fallback_provider:
                     self.logger.info(f"Falling back to provider: {fallback_provider.config.name}")
                     return await self._process_with_provider(fallback_provider, request)
             
             raise e
     
-    async def _get_fallback_provider(self, failed_provider: str) -> Optional[BaseAIProvider]:
-        """Get fallback provider for failed provider"""
+    async def _get_fallback_provider(self, failed_provider: str, request: AIRequest = None) -> Optional[BaseAIProvider]:
+        """Get context-aware fallback provider for failed provider"""
         available_providers = [
             name for name in self._get_available_providers()
             if name != failed_provider
@@ -489,8 +428,28 @@ class AIProviderManager:
         if not available_providers:
             return None
         
+        # Filter providers based on request requirements if request is provided
+        if request:
+            filtered_providers = self._filter_providers_by_capabilities(available_providers, request)
+            if filtered_providers:
+                available_providers = filtered_providers
+        
         # Select fallback using priority
-        return self._select_priority_based(available_providers)
+        selected_provider = self._select_priority_based(available_providers)
+        
+        if selected_provider:
+            self.logger.info(
+                f"Selected fallback provider: {selected_provider.config.name} for failed provider: {failed_provider}"
+            )
+            
+            # Send HA notification about fallback
+            await self._send_ha_notification(
+                f"AI Provider Fallback",
+                f"Switched from {failed_provider} to {selected_provider.config.name}",
+                "warning"
+            )
+        
+        return selected_provider
     
     def _is_circuit_breaker_open(self, provider_name: str) -> bool:
         """Check if circuit breaker is open for provider"""
@@ -519,151 +478,40 @@ class AIProviderManager:
         breaker = self.circuit_breakers[provider_name]
         
         if success:
+            old_state = breaker["state"]
             breaker["failure_count"] = 0
             breaker["state"] = "closed"
+            
+            # Log recovery if state changed
+            if old_state != "closed":
+                self.logger.info(
+                    f"Circuit breaker state transition: {old_state} -> closed for provider: {provider_name} (recovered)"
+                )
         else:
             breaker["failure_count"] += 1
             breaker["last_failure"] = time.time()
             
-            # Open circuit breaker if too many failures
-            if breaker["failure_count"] >= 5:
+            # Update circuit breaker if too many failures (faster opening)
+            max_failures = breaker.get("max_failures", 3)
+            if breaker["failure_count"] >= max_failures:
+                old_state = breaker["state"]
                 breaker["state"] = "open"
-                self.logger.warning(f"Circuit breaker opened for provider: {provider_name}")
-    
-    def _generate_cache_key(self, request: AIRequest) -> str:
-        """Generate cache key for request"""
-        import hashlib
-        
-        # Create key from prompt and image
-        key_data = request.prompt
-        if request.image_path:
-            with open(request.image_path, 'rb') as f:
-                key_data += hashlib.md5(f.read()).hexdigest()
-        
-        return hashlib.md5(key_data.encode()).hexdigest()
-    
-    def _get_cached_response(self, cache_key: str) -> Optional[AIResponse]:
-        """Get cached response if valid"""
-        if cache_key not in self.cache:
-            return None
-        
-        cache_entry = self.cache[cache_key]
-        
-        # Check if cache is still valid
-        if time.time() - cache_entry["timestamp"] > self.cache_ttl:
-            del self.cache[cache_key]
-            return None
-        
-        # Update cached response
-        response = cache_entry["response"]
-        response.cached = True
-        
-        return response
-    
-    def _cache_response(self, cache_key: str, response: AIResponse):
-        """Cache response"""
-        self.cache[cache_key] = {
-            "response": response,
-            "timestamp": time.time()
-        }
-    
-    def _update_stats(self, provider_name: str, response: AIResponse, total_time: float):
-        """Update statistics"""
-        self.stats["total_requests"] += 1
-        self.stats["total_cost"] += response.cost
-        self.stats["provider_usage"][provider_name] += 1
-        
-        if response.error:
-            self.stats["failed_requests"] += 1
-        else:
-            self.stats["successful_requests"] += 1
-        
-        # Update average response time
-        self.stats["average_response_time"] = (
-            (self.stats["average_response_time"] * (self.stats["total_requests"] - 1) + total_time) /
-            self.stats["total_requests"]
-        )
-    
-    def _matches_routing_rule(self, request: AIRequest, rule: RoutingRule) -> bool:
-        """Check if request matches routing rule"""
-        # Simple rule matching - can be extended
-        if rule.condition == "image_analysis" and (request.image_path or request.image_data):
-            return True
-        elif rule.condition == "text_only" and not (request.image_path or request.image_data):
-            return True
-        
-        return False
-    
-    async def _process_request_queue(self):
-        """Process requests from queue with batching"""
-        while True:
-            try:
-                batch = []
                 
-                # Collect requests for batch
-                timeout_start = time.time()
-                while len(batch) < self.batch_size and (time.time() - timeout_start) < self.batch_timeout:
-                    try:
-                        request = await asyncio.wait_for(
-                            self.request_queue.get(),
-                            timeout=self.batch_timeout
-                        )
-                        batch.append(request)
-                    except asyncio.TimeoutError:
-                        break
+                # Log state transition
+                self.logger.warning(
+                    f"Circuit breaker state transition: {old_state} -> open for provider: {provider_name} "
+                    f"(failures: {breaker['failure_count']}/{max_failures})"
+                )
                 
-                # Process batch
-                if batch:
-                    await self._process_batch(batch)
-                
-            except Exception as e:
-                self.logger.error(f"Error in request queue processing: {e}")
-                await asyncio.sleep(1)
+                # Send HA notification (async call needs to be handled properly)
+                asyncio.create_task(self._send_ha_notification(
+                    f"AI Provider Circuit Breaker",
+                    f"Provider {provider_name} circuit breaker opened after {breaker['failure_count']} failures",
+                    "error"
+                ))
     
-    async def _process_batch(self, batch: List[AIRequest]):
-        """Process a batch of requests"""
-        # Group requests by optimal provider
-        provider_batches = {}
-        
-        for request in batch:
-            provider = await self._select_provider(request)
-            if provider:
-                provider_name = provider.config.name
-                if provider_name not in provider_batches:
-                    provider_batches[provider_name] = []
-                provider_batches[provider_name].append(request)
-        
-        # Process each provider's batch
-        tasks = []
-        for provider_name, requests in provider_batches.items():
-            provider = self.providers[provider_name]
-            if hasattr(provider, 'batch_process_requests'):
-                tasks.append(provider.batch_process_requests(requests))
-            else:
-                # Fallback to individual processing
-                for request in requests:
-                    tasks.append(self._process_with_provider(provider, request))
-        
-        # Wait for all tasks
-        await asyncio.gather(*tasks, return_exceptions=True)
     
-    async def batch_process_requests(self, requests: List[AIRequest]) -> List[AIResponse]:
-        """
-        Process multiple requests efficiently.
-        
-        Args:
-            requests: List of requests to process
-            
-        Returns:
-            List of responses
-        """
-        responses = []
-        
-        for request in requests:
-            response = await self.process_request(request)
-            responses.append(response)
-        
-        return responses
+    
     
     def get_provider_status(self) -> Dict[str, Any]:
         """Get status of all providers"""
@@ -685,15 +533,10 @@ class AIProviderManager:
         """Get comprehensive performance metrics"""
         return {
             "overall_stats": self.stats,
-            "provider_performance": self.provider_performance,
             "provider_status": self.get_provider_status(),
             "cache_stats": {
                 "entries": len(self.cache),
                 "hit_rate": self._calculate_cache_hit_rate()
-            },
-            "routing": {
-                "strategy": self.selection_strategy.value,
-                "rules": [rule.__dict__ for rule in self.routing_rules]
             }
         }
     
@@ -748,20 +591,6 @@ class AIProviderManager:
         
         self.logger.info("AI Provider Manager shutdown complete")
     
-    def add_routing_rule(self, rule: RoutingRule):
-        """Add a routing rule"""
-        self.routing_rules.append(rule)
-        self.logger.info(f"Added routing rule: {rule.condition} -> {rule.provider}")
-    
-    def remove_routing_rule(self, condition: str):
-        """Remove routing rule by condition"""
-        self.routing_rules = [r for r in self.routing_rules if r.condition != condition]
-        self.logger.info(f"Removed routing rule: {condition}")
-    
-    def set_selection_strategy(self, strategy: ProviderSelectionStrategy):
-        """Set provider selection strategy"""
-        self.selection_strategy = strategy
-        self.logger.info(f"Set selection strategy to: {strategy.value}")
     
     def clear_cache(self):
         """Clear response cache"""
@@ -787,3 +616,101 @@ class AIProviderManager:
             "provider_costs": provider_costs,
             "average_cost_per_request": total_cost / max(1, self.stats["total_requests"])
         }
+    
+    def _filter_providers_by_capabilities(self, provider_names: List[str], request: AIRequest) -> List[str]:
+        """
+        Filter providers based on request requirements and their capabilities.
+        
+        Args:
+            provider_names: List of available provider names
+            request: AI request to analyze for requirements
+            
+        Returns:
+            List of provider names that can handle the request
+        """
+        if not provider_names:
+            return []
+        
+        # Determine request requirements
+        requires_vision = bool(request.image_path or request.image_data)
+        requires_code = self._is_code_request(request.prompt)
+        
+        suitable_providers = []
+        
+        for provider_name in provider_names:
+            if provider_name not in self.providers:
+                continue
+                
+            provider = self.providers[provider_name]
+            capabilities = provider.capabilities
+            
+            # Check vision requirement
+            if requires_vision and not capabilities.get("vision", False):
+                self.logger.debug(f"Provider {provider_name} skipped: no vision capability")
+                continue
+            
+            # Check code generation requirement
+            if requires_code and not capabilities.get("code_generation", False):
+                self.logger.debug(f"Provider {provider_name} skipped: no code generation capability")
+                continue
+            
+            # Check if provider supports instruction following
+            if not capabilities.get("instruction_following", True):
+                self.logger.debug(f"Provider {provider_name} skipped: poor instruction following")
+                continue
+            
+            suitable_providers.append(provider_name)
+            self.logger.debug(f"Provider {provider_name} suitable for request requirements")
+        
+        return suitable_providers
+    
+    def _is_code_request(self, prompt: str) -> bool:
+        """
+        Determine if a prompt is requesting code generation.
+        
+        Args:
+            prompt: Request prompt to analyze
+            
+        Returns:
+            True if prompt appears to be code-related
+        """
+        code_indicators = [
+            "write code", "generate code", "create function", "implement",
+            "debug", "fix code", "optimize code", "refactor",
+            "python", "javascript", "java", "c++", "html", "css",
+            "algorithm", "data structure", "api", "class", "method",
+            "function", "variable", "loop", "condition", "error",
+            "syntax", "compile", "execute", "script", "program"
+        ]
+        
+        prompt_lower = prompt.lower()
+        return any(indicator in prompt_lower for indicator in code_indicators)
+    
+    async def _send_ha_notification(self, title: str, message: str, level: str = "info"):
+        """
+        Send notification to Home Assistant.
+        
+        Args:
+            title: Notification title
+            message: Notification message
+            level: Notification level (info, warning, error)
+        """
+        if not self.hass:
+            return
+        
+        try:
+            await self.hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": title,
+                    "message": message,
+                    "notification_id": f"aicleaner_ai_{int(time.time())}",
+                },
+                blocking=True,
+            )
+            
+            self.logger.debug(f"Sent HA notification: {title} - {message}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send HA notification: {e}")

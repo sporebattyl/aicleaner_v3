@@ -1,0 +1,48 @@
+# Edge case configuration for testing error handling and validation
+
+ai_providers:
+  # Provider with minimal configuration
+  - provider: ollama
+    enabled: true
+    priority: 1
+    
+  # Provider with all optional fields
+  - provider: openai
+    enabled: true
+    api_key: "env(OPENAI_API_KEY)"
+    base_url: "https://api.openai.com/v1"
+    models:
+      text: "gpt-4o"
+      vision: "gpt-4o"
+      code: "gpt-4o"
+      embedding: "text-embedding-3-large"
+    timeout: 90
+    max_retries: 3
+    priority: 2
+    capabilities:
+      - "text"
+      - "vision" 
+      - "code"
+      - "embedding"
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 150000
+      
+  # Disabled provider (should be skipped)
+  - provider: gemini
+    enabled: false
+    api_key: "env(GEMINI_API_KEY)"
+    priority: 3
+    
+  # Provider with custom configuration
+  - provider: anthropic
+    enabled: true
+    api_key: "env(ANTHROPIC_API_KEY)"
+    models:
+      text: "claude-3-5-sonnet-20241022"
+      code: "claude-3-5-sonnet-20241022"
+    timeout: 120
+    priority: 4
+    custom_settings:
+      max_tokens: 4096
+      temperature: 0.7

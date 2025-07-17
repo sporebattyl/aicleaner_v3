@@ -1,169 +1,116 @@
-# Development configuration for AI Cleaner v3
-display_name: AI Cleaner
-gemini_api_key: "YOUR_GEMINI_API_KEY"
+# AICleaner v3 Multi-Tier Configuration
+name: "AICleaner v3 Multi-Tier"
+version: "3.0.0"
+description: "AI-powered Home Assistant addon with multi-tier architecture"
 
-# Home Assistant connection
-ha_token: "YOUR_HA_TOKEN"
-ha_api_url: "http://supervisor/core/api"
-
-# MQTT configuration (optional)
-mqtt_enabled: false
-mqtt_host: "core-mosquitto"
-mqtt_port: 1883
-mqtt_username: ""
-mqtt_password: ""
-
-# AI Enhancements Configuration
-ai_enhancements:
-  # Enable/disable advanced scene understanding
-  advanced_scene_understanding: true
-
-  # Enable/disable predictive analytics
-  predictive_analytics: true
-
-  # Model selection now handled through local_llm.preferred_models section below
-
-  # Caching configuration
-  caching:
-    enabled: true
-    ttl_seconds: 300                     # Cache time-to-live (5 minutes)
-    intermediate_caching: true           # Enable intermediate result caching
-    max_cache_entries: 1000              # Maximum number of cache entries
-
-  # Scene understanding settings
-  scene_understanding_settings:
-    max_objects_detected: 10             # Maximum objects to detect per scene
-    max_generated_tasks: 8               # Maximum granular tasks to generate
-    confidence_threshold: 0.7            # Minimum confidence for object detection
-    enable_seasonal_adjustments: true    # Enable seasonal cleaning adjustments
-    enable_time_context: true            # Enable time-of-day context awareness
-
-  # Predictive analytics settings
-  predictive_analytics_settings:
-    history_days: 30                     # Days of history to analyze
-    prediction_horizon_hours: 24         # Hours ahead to predict
-    min_data_points: 5                   # Minimum data points for predictions
-    enable_urgency_scoring: true         # Enable cleaning urgency scoring
-    enable_pattern_detection: true       # Enable usage pattern detection
-
-  # Multi-model AI settings
-  multi_model_ai:
-    enable_fallback: true                # Enable automatic model fallback
-    max_retries: 3                       # Maximum retry attempts per model
-    timeout_seconds: 30                  # Request timeout per model
-    performance_tracking: true           # Track model performance metrics
-
-  # Local LLM settings (Ollama integration)
-  local_llm:
-    enabled: true                        # Enable local LLM processing
-    ollama_host: "localhost:11434"       # Ollama server host and port
-    preferred_models:
-      vision: "llava:13b"                # Vision model for image analysis
-      text: "mistral:7b"                 # Text model for general tasks
-      task_generation: "mistral:7b"      # Model for cleaning task generation
-      fallback: "gemini"                 # Fallback to cloud when local fails
-    resource_limits:
-      max_cpu_usage: 80                  # Maximum CPU usage percentage
-      max_memory_usage: 4096             # Maximum memory usage in MB
-    performance_tuning:
-      quantization_level: 4              # 4-bit quantization for efficiency
-      batch_size: 1                      # Batch size for processing
-      timeout_seconds: 120               # Timeout for local model inference
-    auto_download: true                  # Automatically download missing models
-    max_concurrent: 1                    # Maximum concurrent local model requests
-
-# Inference Tuning Configuration (Simplified Profile-Based)
-inference_tuning:
+# Multi-Tier Architecture Configuration
+multi_tier:
   enabled: true
-  profile: "auto"  # auto, resource_efficient, balanced, maximum_performance
+  default_tier: "hybrid"  # hybrid, local, cloud
+  
+  # Tier 1: Privacy-Preserving Hybrid
+  hybrid:
+    enabled: true
+    privacy_pipeline: true
+    cloud_fallback: true
+    target_response_time: 15  # seconds
+  
+  # Tier 2: Full Local Processing
+  local:
+    enabled: true
+    amd_optimization: true
+    model_preference: "llava:7b"
+    target_response_time: 120  # seconds
+  
+  # Tier 3: Pure Cloud
+  cloud:
+    enabled: true
+    providers: ["openai", "anthropic", "google"]
+    target_response_time: 10  # seconds
 
-# Performance Optimization Configuration (Phase 3C.2) - MIGRATED TO INFERENCE_TUNING
-performance_optimization_backup_2024-01-15T10-30-00:
-  # Model Quantization Settings
-  quantization:
-    enabled: true                        # Enable dynamic quantization
-    default_level: "dynamic"             # auto, dynamic, fp16, int8, int4
-    levels: [4, 8, 16]                  # Available quantization levels
-    auto_select: true                    # Automatically select best quantization level
-    memory_threshold_mb: 2048            # Auto-quantize models larger than this
+# Privacy Pipeline Configuration
+privacy:
+  enabled: true
+  default_level: "balanced"  # paranoid, balanced, speed
+  preprocessing_timeout: 5   # seconds
+  
+  levels:
+    paranoid:
+      face_detection: true
+      text_sanitization: true
+      object_anonymization: true
+      pii_removal: true
+    balanced:
+      face_detection: true
+      text_sanitization: true
+      object_anonymization: false
+      pii_removal: true
+    speed:
+      face_detection: false
+      text_sanitization: true
+      object_anonymization: false
+      pii_removal: false
 
-  # Model Compression Settings
-  compression:
-    enabled: true                        # Enable model compression
-    default_type: "gzip"                 # none, gzip, pruning, distillation
-    auto_compress: true                  # Automatically compress large models
-    size_threshold_gb: 2.0               # Auto-compress models larger than this
+# AMD Hardware Optimization
+amd_optimization:
+  enabled: true
+  cpu: "8845hs"
+  igpu: "780m"
+  memory: "64gb"
+  
+  models:
+    llava_7b:
+      enabled: true
+      gpu_layers: 20
+      context_length: 4096
+      quantization: "Q4_K_M"
+    llava_13b:
+      enabled: true
+      gpu_layers: 26
+      context_length: 4096
+      quantization: "Q4_K_M"
 
-  # GPU Acceleration Settings
-  gpu_acceleration:
-    enabled: false                       # Enable GPU acceleration (requires compatible hardware)
-    auto_detect: true                    # Automatically detect GPU availability
-    memory_fraction: 0.8                 # Fraction of GPU memory to use
-    fallback_to_cpu: true               # Fallback to CPU if GPU fails
+# Cloud Provider Configuration (Simplified)
+providers:
+  openai:
+    enabled: true
+    priority: 1
+    model: "gpt-4-vision-preview"
+    timeout: 10
+    
+  anthropic:
+    enabled: true
+    priority: 2
+    model: "claude-3-5-sonnet-20241022"
+    timeout: 10
+    
+  google:
+    enabled: true
+    priority: 3
+    model: "gemini-1.5-flash"
+    timeout: 8
+    
+  llamacpp_amd:
+    enabled: true
+    priority: 4
+    model: "llava:7b"
+    timeout: 120
 
-  # Resource Management Settings
-  resource_management:
-    memory_limit_mb: 4096                # Maximum memory usage for local models
-    cpu_limit_percent: 80                # Maximum CPU usage percentage
-    model_cache_size: 2                  # Maximum number of models to keep loaded
-    unload_timeout_minutes: 30           # Unload unused models after this time
-    auto_cleanup: true                   # Automatically cleanup unused resources
+# Home Assistant Integration
+home_assistant:
+  enabled: true
+  api_url: "http://supervisor/core/api"
+  zones:
+    - name: "Living Room"
+      camera: "camera.living_room"
+      todo_list: "todo.living_room_tasks"
+    - name: "Kitchen"  
+      camera: "camera.kitchen"
+      todo_list: "todo.kitchen_tasks"
 
-  # Auto-tuning Settings
-  auto_tuning:
-    enabled: true                        # Enable automatic performance tuning
-    learning_rate: 0.01                  # Learning rate for adaptive optimization
-    adaptation_interval_hours: 24        # How often to adapt settings
-    min_samples: 10                      # Minimum samples before adapting
-    performance_target: "balanced"       # conservative, balanced, aggressive
-
-  # Monitoring and Alerts
-  monitoring:
-    enabled: true                        # Enable performance monitoring
-    metrics_retention_hours: 168         # Keep metrics for 7 days
-    alert_thresholds:
-      memory_usage_percent: 90           # Alert when memory usage exceeds this
-      cpu_usage_percent: 95              # Alert when CPU usage exceeds this
-      response_time_seconds: 60          # Alert when response time exceeds this
-      error_rate_percent: 5              # Alert when error rate exceeds this
-
-  # Benchmarking Settings
-  benchmarking:
-    enabled: true                        # Enable automated benchmarking
-    schedule_interval_hours: 24          # Run benchmarks every 24 hours
-    baseline_update_days: 7              # Update performance baselines weekly
-    regression_threshold_percent: 20     # Alert if performance degrades by this much
-
-  # Caching and Optimization
-  caching:
-    inference_cache_enabled: true        # Enable inference result caching
-    cache_ttl_minutes: 5                 # Cache time-to-live
-    max_cache_entries: 100               # Maximum number of cached results
-    cache_compression: true              # Compress cached results
-
-  # Advanced Settings
-  advanced:
-    batch_optimization: true             # Enable batch processing optimization
-    context_window_optimization: true    # Optimize context window sizes
-    prompt_optimization: true            # Enable prompt optimization
-    model_switching_optimization: true   # Optimize model switching times
-
-# Zones configuration
-zones:
-  - name: Living Room
-    camera_entity: camera.living_room
-    todo_list_entity: todo.living_room
-    purpose: "Living room for relaxation and entertainment"
-    interval_minutes: 60
-    ignore_rules:
-      - "Ignore items on the coffee table"
-      - "Don't worry about books on the bookshelf"
-
-  - name: Kitchen
-    camera_entity: camera.kitchen
-    todo_list_entity: todo.kitchen
-    purpose: "Kitchen for cooking and food preparation"
-    interval_minutes: 120
-    ignore_rules:
-      - "Ignore items in the sink if they appear to be soaking"
-      - "Don't worry about appliances on the counter"
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "/data/logs/aicleaner.log"
+  max_size: "10MB"
+  backup_count: 5

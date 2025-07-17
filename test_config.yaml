@@ -1,0 +1,30 @@
+ai_providers:
+  - provider: google
+    enabled: true
+    api_key: "env(GEMINI_API_KEY)"
+    models:
+      text: "gemini-2.5-pro"
+      vision: "gemini-2.5-pro"
+      code: "gemini-2.5-flash"
+    timeout: 90
+    priority: 1
+  - provider: ollama
+    enabled: true
+    base_url: "http://localhost:11434"
+    models:
+      text: "llama3:latest"
+      vision: "llava:latest"
+      code: "codellama:latest"
+    timeout: 120
+    priority: 2
+  - provider: openai
+    enabled: false
+    api_key: "env(OPENAI_API_KEY)"
+    models:
+      text: "gpt-4o"
+      vision: "gpt-4o"
+      code: "gpt-4o"
+    timeout: 90
+    priority: 3
+
+created_date: "2025-01-15T10:00:00"

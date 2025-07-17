@@ -383,6 +383,22 @@ class OpenAIProvider(BaseAIProvider):
             "supported_formats": ["jpeg", "png", "gif", "webp"]
         }
     
+    @property
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        Get OpenAI provider capabilities for context-aware fallback selection.
+        
+        Returns:
+            Dictionary with capability flags
+        """
+        return {
+            "vision": True,                    # GPT-4V supports image analysis
+            "code_generation": True,           # Excellent at code generation
+            "instruction_following": True,     # Strong instruction following
+            "multimodal": True,               # Supports text and images
+            "local_model": False              # Cloud-based service
+        }
+    
     async def batch_process_requests(self, requests: List[AIRequest]) -> List[AIResponse]:
         """
         Process multiple requests efficiently.

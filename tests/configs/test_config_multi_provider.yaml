@@ -1,0 +1,27 @@
+ai_providers:
+  - provider: ollama
+    enabled: true
+    base_url: "http://localhost:11434"
+    models:
+      text: "llama3:latest"
+      vision: "llava:latest"
+      code: "codellama:latest"
+    timeout: 120
+    priority: 1
+  - provider: openai
+    enabled: true
+    api_key: "env(OPENAI_API_KEY)"
+    models:
+      text: "gpt-4o"
+      vision: "gpt-4o"
+      code: "gpt-4o"
+    timeout: 90
+    priority: 2
+  - provider: gemini
+    enabled: true
+    api_key: "env(GEMINI_API_KEY)"
+    models:
+      text: "gemini-1.5-pro-latest"
+      vision: "gemini-1.5-pro-latest"
+    timeout: 90
+    priority: 3

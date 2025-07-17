@@ -16,6 +16,11 @@ from datetime import datetime
 import aiohttp
 from PIL import Image
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 from .base_provider import (
     BaseAIProvider, AIProviderConfiguration, AIRequest, AIResponse,
     AIProviderStatus, AIProviderError
@@ -29,12 +34,12 @@ class OllamaProvider(BaseAIProvider):
     Ollama local model provider with enhanced features.
     
     Features:
-    - Local model support (LLaVA, Mistral, etc.)
+    - Dynamic model loading and unloading
+    - Resource-aware health checks
+    - API-based capability detection
     - Connection pooling
-    - Request batching
     - Advanced error handling
     - Performance monitoring
-    - Model management
     """
     
     def __init__(self, config: AIProviderConfiguration):
@@ -48,9 +53,20 @@ class OllamaProvider(BaseAIProvider):
         
         # Ollama specific configuration
         self.base_url = config.base_url or "http://localhost:11434"
-        self.model_name = config.model_name or "llava:13b"
+        self.default_model_name = config.model_name or "llava:13b"
         self.temperature = 0.1
         self.max_tokens = 4000
+        
+        # Dynamic model management
+        self.active_model: Optional[str] = None
+        self.active_model_timer: Optional[asyncio.TimerHandle] = None
+        self.model_unload_timeout = 120  # seconds
+        
+        # Resource-aware health check thresholds
+        self.resource_thresholds = {
+            "cpu_percent": 90.0,
+            "memory_percent": 90.0,
+        }
         
         # Rate limiter (more lenient for local models)
         rate_config = RateLimitConfig(
@@ -388,6 +404,29 @@ class OllamaProvider(BaseAIProvider):
             model_info["supported_formats"] = ["jpeg", "png", "gif", "webp"]
         
         return model_info
+    
+    @property
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        Get Ollama provider capabilities for context-aware fallback selection.
+        
+        Returns:
+            Dictionary with capability flags
+        """
+        # Check if it's a vision model
+        has_vision = "llava" in self.model_name.lower() or "vision" in self.model_name.lower()
+        
+        # Check if it's a code-focused model
+        has_code_generation = any(term in self.model_name.lower() for term in 
+                                ["code", "coder", "deepseek", "granite", "starcoder"])
+        
+        return {
+            "vision": has_vision,              # Vision support depends on model
+            "code_generation": has_code_generation or "llama" in self.model_name.lower(),  # Many models can code
+            "instruction_following": True,     # Most local models follow instructions well
+            "multimodal": has_vision,         # Multimodal if vision enabled
+            "local_model": True              # Always local
+        }
     
     async def batch_process_requests(self, requests: List[AIRequest]) -> List[AIResponse]:
         """

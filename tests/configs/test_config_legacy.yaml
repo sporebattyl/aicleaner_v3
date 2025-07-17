@@ -1,0 +1,13 @@
+ai_model:
+  provider: "openai"
+  model_name: "gpt-4-vision-preview"
+openai:
+  api_key: "env(OPENAI_API_KEY)"
+  enabled: true
+gemini:
+  api_key: "env(GEMINI_API_KEY)"
+  enabled: true
+local_llm:
+  enabled: true
+  base_url: "http://localhost:11434"
+  model: "llama3:latest"

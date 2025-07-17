@@ -1,0 +1,10 @@
+ai_providers:
+  - provider: ollama
+    enabled: true
+    base_url: "http://localhost:11434"
+    models:
+      text: "llama3:latest"
+      vision: "llava:latest"
+      code: "codellama:latest"
+    timeout: 120
+    priority: 1

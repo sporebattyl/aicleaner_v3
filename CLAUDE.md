@@ -64,6 +64,19 @@
 - Continuous security and performance validation throughout
 - Focus on defensive security and production-ready code
 
+**Enhanced Gemini-Claude Orchestration Strategy:**
+- **Use Gemini-CLI tool extensively** for optimization tasks due to much larger context window
+- **Large file and codebase reviews** should be initiated by Gemini for comprehensive analysis
+- **Claude file reading limit:** 25,000 tokens per read - inform Gemini when sharing large files
+- **After Gemini identifies potential errors or improvement areas:**
+  1. Converse with Gemini to develop the best solution approach
+  2. Have Gemini provide detailed implementation diffs
+  3. Claude reviews and validates the proposed changes
+  4. Iterate back and forth until both AI agents agree on optimal implementation
+  5. Claude finalizes and applies the agreed-upon diff
+- **Use subagents extensively** so Claude can act as orchestrator ensuring smooth execution
+- **Leverage Gemini's superior context capacity** for complex architectural decisions and large-scale refactoring
+
 ### MCP Configuration (Updated - 2025-07-15) - FINAL WORKING
 ```json
 {

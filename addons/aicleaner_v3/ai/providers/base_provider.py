@@ -204,6 +204,22 @@ class BaseAIProvider(ABC):
         """
         pass
     
+    @property
+    @abstractmethod
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        Get provider capabilities for context-aware fallback selection.
+        
+        Returns:
+            Dictionary with capability flags:
+            - vision: Can process images
+            - code_generation: Can generate code
+            - instruction_following: Can follow instructions
+            - multimodal: Supports multiple input types
+            - local_model: Is a local model
+        """
+        pass
+    
     async def analyze_image(self, image_path: str, prompt: str, 
                           context: Optional[Dict[str, Any]] = None) -> AIResponse:
         """

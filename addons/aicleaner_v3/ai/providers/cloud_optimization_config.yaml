@@ -1,0 +1,197 @@
+# Cloud Integration Optimization Configuration
+# AICleaner v3 - Optimized AI Provider Manager
+# 
+# This configuration enables comprehensive cloud API optimization including:
+# - <10 second response times through intelligent routing
+# - Content-aware provider selection
+# - Smart caching with Privacy Pipeline integration
+# - Predictive failover capabilities
+# - Cost optimization and budget management
+# - Real-time performance monitoring
+
+# Global optimization settings
+optimization_enabled: true
+data_retention_days: 30
+
+# Provider configurations with enhanced capabilities
+providers:
+  openai:
+    enabled: true
+    priority: 1
+    model_name: "gpt-4o"
+    api_key: "${OPENAI_API_KEY}"
+    base_url: null
+    # Enhanced configuration will be auto-generated based on provider type
+    
+  anthropic:
+    enabled: true
+    priority: 1
+    model_name: "claude-3-5-sonnet-20241022"
+    api_key: "${ANTHROPIC_API_KEY}"
+    base_url: null
+    
+  google:
+    enabled: true
+    priority: 2
+    model_name: "gemini-2.0-flash-exp"
+    api_key: "${GOOGLE_API_KEY}"
+    base_url: null
+    
+  ollama:
+    enabled: true
+    priority: 3
+    model_name: "llama3.2"
+    base_url: "http://localhost:11434"
+
+# Content Analyzer Configuration
+content_analyzer:
+  cache_ttl: 3600  # 1 hour cache for analysis results
+  privacy_pipeline_enabled: true
+  
+# Smart Cache Configuration
+smart_cache:
+  cache_strategy: "privacy_aware"  # Options: aggressive, conservative, privacy_aware, performance, cost_optimized
+  max_memory_size: 104857600  # 100MB
+  default_ttl: 3600  # 1 hour
+  max_entries: 10000
+  privacy_safe_only: true
+  
+  # Redis configuration for distributed caching (optional)
+  redis:
+    enabled: false
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: null
+    timeout: 5
+
+# Provider Selection Configuration
+provider_selector:
+  selection_strategy: "weighted_scoring"  # Options: weighted_scoring, cost_optimized, performance_optimized, capability_first, reliability_first
+  
+  # Selection weights (must sum to 1.0)
+  weights:
+    capability_match: 0.4
+    cost_efficiency: 0.3
+    performance_score: 0.3
+    reliability_score: 0.0
+  
+  # Performance tracking
+  cold_start_score: 0.5
+  min_requests_for_stability: 10
+  ranking_update_interval: 60  # seconds
+
+# Intelligent Failover Configuration
+failover_manager:
+  failover_strategy: "tier_based"  # Options: tier_based, capability_preserving, cost_aware, performance_optimized, privacy_preserving
+  enable_predictive_failover: true
+  predictive_threshold: 0.3  # Health score threshold for predictive failover
+  max_consecutive_failures: 3
+  circuit_breaker_timeout: 60.0  # seconds
+  response_time_threshold: 10.0  # seconds
+  quality_threshold: 0.7
+  degradation_threshold: -0.3  # 30% performance degradation
+
+# Performance Monitor Configuration
+performance_monitor:
+  data_dir: "/data/performance"
+  
+  # Budget limits (USD per day)
+  budgets:
+    openai: 50.0
+    anthropic: 50.0
+    google: 30.0
+    ollama: 0.0  # Local provider
+  
+  # Alert thresholds
+  alert_thresholds:
+    response_time:
+      warning: 8.0    # seconds
+      error: 12.0     # seconds  
+      critical: 20.0  # seconds
+    success_rate:
+      warning: 0.95   # 95%
+      error: 0.90     # 90%
+      critical: 0.80  # 80%
+    cost_budget:
+      warning: 0.80   # 80% of daily budget
+      error: 0.90     # 90% of daily budget
+      critical: 0.95  # 95% of daily budget
+
+# Content-Type Specific Timeouts (seconds)
+content_timeouts:
+  text:
+    timeout: 5.0
+    max_retries: 2
+    cache_ttl: 3600
+  image:
+    timeout: 8.0
+    max_retries: 2
+    cache_ttl: 7200
+  code:
+    timeout: 10.0
+    max_retries: 3
+    cache_ttl: 1800
+  multimodal:
+    timeout: 12.0
+    max_retries: 2
+    cache_ttl: 1800
+  document:
+    timeout: 15.0
+    max_retries: 2
+    cache_ttl: 14400
+
+# Privacy Pipeline Integration
+privacy_pipeline:
+  enabled: true
+  require_local_for_sensitive: true
+  anonymization_enabled: true
+  pii_detection_enabled: true
+
+# Cost Optimization Settings
+cost_optimization:
+  enable_cost_tracking: true
+  daily_budget_alerts: true
+  prefer_cheaper_providers: true
+  cost_quality_tradeoff: 0.7  # 0=cost only, 1=quality only
+
+# Performance Optimization Settings  
+performance_optimization:
+  enable_request_batching: false  # Not implemented yet
+  enable_response_streaming: true
+  enable_parallel_requests: false  # Not implemented yet
+  optimize_for_latency: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  structured_logging: true
+  log_performance_metrics: true
+  log_cache_hits: true
+  log_failover_events: true
+
+# Example usage patterns for different scenarios:
+
+# High-Performance Configuration (prioritize speed):
+# selection_strategy: "performance_optimized"
+# cache_strategy: "performance"  
+# failover_strategy: "performance_optimized"
+# optimize_for_latency: true
+
+# Cost-Optimized Configuration (prioritize cost savings):
+# selection_strategy: "cost_optimized"
+# cache_strategy: "cost_optimized"
+# failover_strategy: "cost_aware"
+# prefer_cheaper_providers: true
+
+# Privacy-First Configuration (prioritize data protection):
+# selection_strategy: "capability_first"
+# cache_strategy: "privacy_aware"
+# failover_strategy: "privacy_preserving"
+# require_local_for_sensitive: true
+
+# Balanced Configuration (default recommended):
+# selection_strategy: "weighted_scoring"
+# cache_strategy: "privacy_aware"
+# failover_strategy: "tier_based"
+# All other settings as above

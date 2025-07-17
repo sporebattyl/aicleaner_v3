@@ -66,68 +66,45 @@ class PredictiveAnalyticsSettings:
 
 @dataclass
 class MultiModelAISettings:
-    """Multi-model AI configuration"""
+    """Simplified Multi-model AI configuration for single-user context"""
     enable_fallback: bool = True
     max_retries: int = 3
     timeout_seconds: int = 30
-    performance_tracking: bool = True
 
 @dataclass
 class AIProviderSettings:
-    """AI Provider configuration for Phase 2A"""
+    """Simplified AI Provider configuration for single-user context"""
     enabled: bool = True
     priority: int = 1
-    weight: float = 1.0
     model_name: str = ""
     base_url: Optional[str] = None
-    rate_limit_rpm: int = 60
-    rate_limit_tpm: int = 10000
-    daily_budget: float = 10.0
-    cost_per_request: float = 0.01
     timeout_seconds: int = 30
     max_retries: int = 3
-    health_check_interval: int = 300
-    connection_pool_size: int = 10
-    max_concurrent_requests: int = 5
+    max_concurrent_requests: int = 1
     fallback_enabled: bool = True
 
 @dataclass
 class AIProviderManagerSettings:
-    """AI Provider Manager configuration"""
-    selection_strategy: str = "adaptive"
-    batch_size: int = 5
-    batch_timeout: float = 1.0
-    cache_ttl: int = 300
-    enable_health_monitoring: bool = True
-    enable_cost_tracking: bool = True
-    enable_performance_optimization: bool = True
+    """Simplified AI Provider Manager configuration for single-user context"""
+    selection_strategy: str = "priority"
     
     # Provider configurations
     openai: AIProviderSettings = field(default_factory=lambda: AIProviderSettings(
         enabled=True,
         priority=1,
-        model_name="gpt-4-vision-preview",
-        rate_limit_rpm=60,
-        daily_budget=10.0,
-        cost_per_request=0.02
+        model_name="gpt-4-vision-preview"
     ))
     
     anthropic: AIProviderSettings = field(default_factory=lambda: AIProviderSettings(
         enabled=True,
         priority=2,
-        model_name="claude-3-5-sonnet-20241022",
-        rate_limit_rpm=50,
-        daily_budget=10.0,
-        cost_per_request=0.015
+        model_name="claude-3-5-sonnet-20241022"
     ))
     
     google: AIProviderSettings = field(default_factory=lambda: AIProviderSettings(
         enabled=True,
         priority=3,
-        model_name="gemini-1.5-flash",
-        rate_limit_rpm=100,
-        daily_budget=5.0,
-        cost_per_request=0.005
+        model_name="gemini-1.5-flash"
     ))
     
     ollama: AIProviderSettings = field(default_factory=lambda: AIProviderSettings(
@@ -135,41 +112,14 @@ class AIProviderManagerSettings:
         priority=4,
         model_name="llava:13b",
         base_url="http://localhost:11434",
-        rate_limit_rpm=120,
-        daily_budget=0.0,
-        cost_per_request=0.0,
         timeout_seconds=60
     ))
 
 @dataclass
-class LocalLLMResourceLimits:
-    """Local LLM resource limits"""
-    max_cpu_usage: int = 80
-    max_memory_usage: int = 4096
-
-@dataclass
-class LocalLLMPerformanceTuning:
-    """Local LLM performance tuning"""
-    quantization_level: int = 4
-    batch_size: int = 1
-    timeout_seconds: int = 120
-
-@dataclass
-class LocalLLMPreferredModels:
-    """Local LLM preferred models"""
-    vision: str = "llava:13b"
-    text: str = "mistral:7b"
-    task_generation: str = "mistral:7b"
-    fallback: str = "gemini"
-
-@dataclass
 class LocalLLMSettings:
-    """Local LLM configuration"""
+    """Simplified Local LLM configuration for single-user context"""
     enabled: bool = True
     ollama_host: str = "localhost:11434"
-    preferred_models: LocalLLMPreferredModels = field(default_factory=LocalLLMPreferredModels)
-    resource_limits: LocalLLMResourceLimits = field(default_factory=LocalLLMResourceLimits)
-    performance_tuning: LocalLLMPerformanceTuning = field(default_factory=LocalLLMPerformanceTuning)
     auto_download: bool = True
     max_concurrent: int = 1
 
@@ -325,101 +275,51 @@ class ConfigurationSchemaGenerator:
                 "multi_model_ai": {
                     "enable_fallback": True,
                     "max_retries": 3,
-                    "timeout_seconds": 30,
-                    "performance_tracking": True
+                    "timeout_seconds": 30
                 },
                 "local_llm": {
                     "enabled": True,
                     "ollama_host": "localhost:11434",
-                    "preferred_models": {
-                        "vision": "llava:13b",
-                        "text": "mistral:7b",
-                        "task_generation": "mistral:7b",
-                        "fallback": "gemini"
-                    },
-                    "resource_limits": {
-                        "max_cpu_usage": 80,
-                        "max_memory_usage": 4096
-                    },
-                    "performance_tuning": {
-                        "quantization_level": 4,
-                        "batch_size": 1,
-                        "timeout_seconds": 120
-                    },
                     "auto_download": True,
                     "max_concurrent": 1
                 },
                 "ai_provider_manager": {
-                    "selection_strategy": "adaptive",
-                    "batch_size": 5,
-                    "batch_timeout": 1.0,
-                    "cache_ttl": 300,
-                    "enable_health_monitoring": True,
-                    "enable_cost_tracking": True,
-                    "enable_performance_optimization": True,
+                    "selection_strategy": "priority",
                     "openai": {
                         "enabled": True,
                         "priority": 1,
-                        "weight": 1.0,
                         "model_name": "gpt-4-vision-preview",
-                        "rate_limit_rpm": 60,
-                        "rate_limit_tpm": 10000,
-                        "daily_budget": 10.0,
-                        "cost_per_request": 0.02,
                         "timeout_seconds": 30,
                         "max_retries": 3,
-                        "health_check_interval": 300,
-                        "connection_pool_size": 10,
-                        "max_concurrent_requests": 5,
+                        "max_concurrent_requests": 1,
                         "fallback_enabled": True
                     },
                     "anthropic": {
                         "enabled": True,
                         "priority": 2,
-                        "weight": 0.8,
                         "model_name": "claude-3-5-sonnet-20241022",
-                        "rate_limit_rpm": 50,
-                        "rate_limit_tpm": 8000,
-                        "daily_budget": 10.0,
-                        "cost_per_request": 0.015,
                         "timeout_seconds": 30,
                         "max_retries": 3,
-                        "health_check_interval": 300,
-                        "connection_pool_size": 10,
-                        "max_concurrent_requests": 5,
+                        "max_concurrent_requests": 1,
                         "fallback_enabled": True
                     },
                     "google": {
                         "enabled": True,
                         "priority": 3,
-                        "weight": 1.2,
                         "model_name": "gemini-1.5-flash",
-                        "rate_limit_rpm": 100,
-                        "rate_limit_tpm": 15000,
-                        "daily_budget": 5.0,
-                        "cost_per_request": 0.005,
                         "timeout_seconds": 25,
                         "max_retries": 3,
-                        "health_check_interval": 300,
-                        "connection_pool_size": 15,
-                        "max_concurrent_requests": 8,
+                        "max_concurrent_requests": 1,
                         "fallback_enabled": True
                     },
                     "ollama": {
                         "enabled": True,
                         "priority": 4,
-                        "weight": 0.6,
                         "model_name": "llava:13b",
                         "base_url": "http://localhost:11434",
-                        "rate_limit_rpm": 120,
-                        "rate_limit_tpm": 20000,
-                        "daily_budget": 0.0,
-                        "cost_per_request": 0.0,
                         "timeout_seconds": 60,
                         "max_retries": 2,
-                        "health_check_interval": 300,
-                        "connection_pool_size": 5,
-                        "max_concurrent_requests": 3,
+                        "max_concurrent_requests": 1,
                         "fallback_enabled": True
                     }
                 }
@@ -472,101 +372,50 @@ class ConfigurationSchemaGenerator:
                 "multi_model_ai": {
                     "enable_fallback": "bool?",
                     "max_retries": "int(1,10)?",
-                    "timeout_seconds": "int(5,300)?",
-                    "performance_tracking": "bool?"
+                    "timeout_seconds": "int(5,300)?"
                 },
                 "local_llm": {
                     "enabled": "bool?",
                     "ollama_host": "str?",
-                    "preferred_models": {
-                        "vision": "str?",
-                        "text": "str?",
-                        "task_generation": "str?",
-                        "fallback": "str?"
-                    },
-                    "resource_limits": {
-                        "max_cpu_usage": "int(10,100)?",
-                        "max_memory_usage": "int(512,16384)?"
-                    },
-                    "performance_tuning": {
-                        "quantization_level": "int(1,8)?",
-                        "batch_size": "int(1,16)?",
-                        "timeout_seconds": "int(30,600)?"
-                    },
                     "auto_download": "bool?",
                     "max_concurrent": "int(1,10)?"
                 },
                 "ai_provider_manager": {
-                    "selection_strategy": "list(round_robin|least_loaded|fastest_response|cost_optimal|priority_based|adaptive)?",
-                    "batch_size": "int(1,20)?",
-                    "batch_timeout": "float(0.1,10.0)?",
-                    "cache_ttl": "int(60,3600)?",
-                    "enable_health_monitoring": "bool?",
-                    "enable_cost_tracking": "bool?",
-                    "enable_performance_optimization": "bool?",
+                    "selection_strategy": "list(priority)?",
                     "openai": {
                         "enabled": "bool?",
                         "priority": "int(1,10)?",
-                        "weight": "float(0.1,5.0)?",
                         "model_name": "str?",
-                        "rate_limit_rpm": "int(1,1000)?",
-                        "rate_limit_tpm": "int(100,100000)?",
-                        "daily_budget": "float(0.0,1000.0)?",
-                        "cost_per_request": "float(0.001,1.0)?",
                         "timeout_seconds": "int(5,300)?",
                         "max_retries": "int(0,10)?",
-                        "health_check_interval": "int(60,3600)?",
-                        "connection_pool_size": "int(1,50)?",
                         "max_concurrent_requests": "int(1,20)?",
                         "fallback_enabled": "bool?"
                     },
                     "anthropic": {
                         "enabled": "bool?",
                         "priority": "int(1,10)?",
-                        "weight": "float(0.1,5.0)?",
                         "model_name": "str?",
-                        "rate_limit_rpm": "int(1,1000)?",
-                        "rate_limit_tpm": "int(100,100000)?",
-                        "daily_budget": "float(0.0,1000.0)?",
-                        "cost_per_request": "float(0.001,1.0)?",
                         "timeout_seconds": "int(5,300)?",
                         "max_retries": "int(0,10)?",
-                        "health_check_interval": "int(60,3600)?",
-                        "connection_pool_size": "int(1,50)?",
                         "max_concurrent_requests": "int(1,20)?",
                         "fallback_enabled": "bool?"
                     },
                     "google": {
                         "enabled": "bool?",
                         "priority": "int(1,10)?",
-                        "weight": "float(0.1,5.0)?",
                         "model_name": "str?",
-                        "base_url": "str?",
-                        "rate_limit_rpm": "int(1,1000)?",
-                        "rate_limit_tpm": "int(100,100000)?",
-                        "daily_budget": "float(0.0,1000.0)?",
-                        "cost_per_request": "float(0.0,1.0)?",
                         "timeout_seconds": "int(5,300)?",
                         "max_retries": "int(0,10)?",
-                        "health_check_interval": "int(60,3600)?",
-                        "connection_pool_size": "int(1,50)?",
                         "max_concurrent_requests": "int(1,20)?",
                         "fallback_enabled": "bool?"
                     },
                     "ollama": {
                         "enabled": "bool?",
                         "priority": "int(1,10)?",
-                        "weight": "float(0.1,5.0)?",
                         "model_name": "str?",
                         "base_url": "str?",
-                        "rate_limit_rpm": "int(1,1000)?",
-                        "rate_limit_tpm": "int(100,100000)?",
-                        "daily_budget": "float(0.0,1000.0)?",
-                        "cost_per_request": "float(0.0,1.0)?",
                         "timeout_seconds": "int(5,300)?",
                         "max_retries": "int(0,10)?",
-                        "health_check_interval": "int(60,3600)?",
-                        "connection_pool_size": "int(1,50)?",
                         "max_concurrent_requests": "int(1,20)?",
                         "fallback_enabled": "bool?"
                     }

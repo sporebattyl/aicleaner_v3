@@ -394,6 +394,22 @@ class GoogleProvider(BaseAIProvider):
             "context_window": 1000000 if "1.5" in self.model_name else 32000
         }
     
+    @property
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        Get Google provider capabilities for context-aware fallback selection.
+        
+        Returns:
+            Dictionary with capability flags
+        """
+        return {
+            "vision": True,                    # Gemini excellent at image analysis
+            "code_generation": True,           # Strong code generation capabilities
+            "instruction_following": True,     # Excellent instruction following
+            "multimodal": True,               # Native multimodal support
+            "local_model": False              # Cloud-based service
+        }
+    
     async def batch_process_requests(self, requests: List[AIRequest]) -> List[AIResponse]:
         """
         Process multiple requests efficiently.
