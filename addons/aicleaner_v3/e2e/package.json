@@ -1,0 +1,24 @@
+{
+  "name": "aicleaner-v3-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for AICleaner v3",
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:run:chrome": "cypress run --browser chrome",
+    "cy:run:firefox": "cypress run --browser firefox",
+    "test:e2e": "cypress run --spec 'e2e/specs/**/*.cy.js'",
+    "test:e2e:headless": "cypress run --headless --spec 'e2e/specs/**/*.cy.js'"
+  },
+  "devDependencies": {
+    "cypress": "^13.0.0"
+  },
+  "keywords": [
+    "e2e",
+    "testing",
+    "cypress",
+    "aicleaner"
+  ],
+  "author": "AICleaner v3 Team",
+  "license": "MIT"
+}

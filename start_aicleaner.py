@@ -18,7 +18,12 @@ async def main():
     print("🚀 Starting AICleaner v3 Multi-Tier System...")
     
     try:
-        # Initialize Privacy Pipeline
+        # Start FastAPI backend with UI
+        print("🌐 Starting Web Interface...")
+        import uvicorn
+        from api.backend import app
+        
+        # Start backend services as background tasks
         print("🔒 Initializing Privacy Pipeline...")
         from privacy.main_pipeline import PrivacyPipeline
         privacy_pipeline = PrivacyPipeline()
@@ -36,14 +41,21 @@ async def main():
         amd_manager = AMDIntegrationManager()
         print("✅ AMD Optimization ready")
         
-        # Start the main system
         print("🎭 Multi-Tier System fully operational!")
         print("📊 Available tiers: Hybrid, Local, Cloud")
         print("🏠 Home Assistant integration active")
+        print("🌐 Web UI available at http://localhost:8000")
         
-        # Keep the system running
-        while True:
-            await asyncio.sleep(60)  # Check status every minute
+        # Start the web server
+        config = uvicorn.Config(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+            reload=False
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
             
     except KeyboardInterrupt:
         print("\n⏹️ Shutting down AICleaner v3...")

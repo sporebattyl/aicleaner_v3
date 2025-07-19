@@ -1,0 +1,1 @@
+# This file makes the mqtt_discovery directory a Python package.

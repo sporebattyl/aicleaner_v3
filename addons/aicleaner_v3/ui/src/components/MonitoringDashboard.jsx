@@ -1,8 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, ProgressBar, Badge, Alert } from 'react-bootstrap';
-import { Line } from 'react-chartjs-2';
-import { WebSocketService } from '../services/WebSocketService';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { Card, Row, Col, ProgressBar, Badge, Alert, Spinner } from 'react-bootstrap';
+import WebSocketService from '../services/WebSocketService';
+import { LazyAnalyticsManager } from './LazyChartComponents';
+
+// Lazy load the Line chart component
+const LazyLineChart = lazy(() => import('react-chartjs-2').then(module => ({ default: module.Line })));
 
 export const MonitoringDashboard = () => {
     const [metrics, setMetrics] = useState({});

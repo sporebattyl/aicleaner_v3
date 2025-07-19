@@ -52,6 +52,10 @@ class ConfigurationManager:
         if 'zones' in config and isinstance(config['zones'], list):
             for i, zone in enumerate(config['zones']):
                 self._validate_zone_config(zone, i, is_test)
+        
+        # Validate MQTT configuration if present
+        if 'mqtt' in config and isinstance(config['mqtt'], dict):
+            self._validate_mqtt_config(config['mqtt'])
 
         return len(self.validation_errors) == 0
     
@@ -87,6 +91,51 @@ class ConfigurationManager:
                     f"Valid options: {', '.join(self.valid_personalities)}"
                 )
     
+    def _validate_mqtt_config(self, mqtt_config: Dict[str, Any]) -> None:
+        """Validate MQTT configuration"""
+        # Validate broker_address
+        if 'broker_address' not in mqtt_config or not mqtt_config['broker_address']:
+            self.validation_errors.append("MQTT: broker_address is required")
+        
+        # Validate broker_port
+        if 'broker_port' in mqtt_config:
+            port = mqtt_config['broker_port']
+            if not isinstance(port, int) or port < 1 or port > 65535:
+                self.validation_errors.append("MQTT: broker_port must be between 1 and 65535")
+        
+        # Validate QoS
+        if 'qos' in mqtt_config:
+            qos = mqtt_config['qos']
+            if not isinstance(qos, int) or qos not in [0, 1, 2]:
+                self.validation_errors.append("MQTT: qos must be 0, 1, or 2")
+        
+        # Validate discovery_prefix
+        if 'discovery_prefix' in mqtt_config:
+            prefix = mqtt_config['discovery_prefix']
+            if not isinstance(prefix, str) or not prefix:
+                self.validation_errors.append("MQTT: discovery_prefix must be a non-empty string")
+        
+        # Validate TLS configuration
+        use_tls = mqtt_config.get('use_tls', False)
+        if use_tls:
+            # If TLS is enabled, validate certificate paths exist
+            ca_cert = mqtt_config.get('tls_ca_cert')
+            if ca_cert and not os.path.exists(ca_cert):
+                self.validation_errors.append(f"MQTT: TLS CA certificate file not found: {ca_cert}")
+            
+            cert_file = mqtt_config.get('tls_cert_file')
+            if cert_file and not os.path.exists(cert_file):
+                self.validation_errors.append(f"MQTT: TLS certificate file not found: {cert_file}")
+            
+            key_file = mqtt_config.get('tls_key_file')
+            if key_file and not os.path.exists(key_file):
+                self.validation_errors.append(f"MQTT: TLS key file not found: {key_file}")
+        
+        # Validate credentials - warn if missing in production
+        if not mqtt_config.get('username') and not self._is_test_environment():
+            # This is a warning, not an error, as MQTT can work without auth
+            logger.warning("MQTT: No username configured - ensure broker allows anonymous connections")
+    
     def get_validation_errors(self) -> List[str]:
         """Get list of validation errors from last validation"""
         return self.validation_errors.copy()
@@ -101,7 +150,20 @@ class ConfigurationManager:
         config = {
             'gemini_api_key': os.getenv('GEMINI_API_KEY', ''),
             'display_name': os.getenv('DISPLAY_NAME', 'User'),
-            'zones': []
+            'zones': [],
+            'mqtt': {
+                'broker_address': os.getenv('MQTT_BROKER_ADDRESS', 'localhost'),
+                'broker_port': int(os.getenv('MQTT_BROKER_PORT', '1883')),
+                'username': os.getenv('MQTT_USERNAME'),
+                'password': os.getenv('MQTT_PASSWORD'),
+                'discovery_prefix': os.getenv('MQTT_DISCOVERY_PREFIX', 'homeassistant'),
+                'qos': int(os.getenv('MQTT_QOS', '1')),
+                'use_tls': os.getenv('MQTT_USE_TLS', 'false').lower() == 'true',
+                'tls_ca_cert': os.getenv('MQTT_TLS_CA_CERT'),
+                'tls_cert_file': os.getenv('MQTT_TLS_CERT_FILE'),
+                'tls_key_file': os.getenv('MQTT_TLS_KEY_FILE'),
+                'tls_insecure': os.getenv('MQTT_TLS_INSECURE', 'false').lower() == 'true'
+            }
         }
         
         # Try to load zones from environment if available

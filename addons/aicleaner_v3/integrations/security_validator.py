@@ -11,7 +11,11 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 # Import HA dependencies based on specification
-import hashlib\nimport secrets\nimport jwt
+import hashlib
+import secrets
+import jwt
+import re
+from homeassistant.core import HomeAssistant
 
 class SecurityValidator:
     """
@@ -163,6 +167,147 @@ class SecurityValidator:
             self.performance_metrics['error_count'] += 1
             self.logger.error(f"Error in {self.__class__.__name__}.audit_permissions: {e}")
             raise
+
+    async def validate_supervisor_token(self, token: str) -> bool:
+        """
+        Validate Home Assistant Supervisor API token.
+        
+        Critical security function to prevent unauthorized access to 
+        Home Assistant Supervisor API endpoints.
+        
+        Args:
+            token: The supervisor token to validate
+            
+        Returns:
+            True if token is valid, False otherwise
+        """
+        try:
+            self.logger.debug("Validating supervisor token")
+            
+            # Update performance metrics
+            self.performance_metrics['operation_count'] += 1
+            
+            if not token:
+                self.logger.warning("Empty supervisor token provided")
+                return False
+            
+            # Basic token format validation
+            if not isinstance(token, str) or len(token) < 32:
+                self.logger.warning("Invalid supervisor token format")
+                return False
+            
+            # Check token structure (should be alphanumeric with possible underscores/hyphens)
+            if not re.match(r'^[a-zA-Z0-9_-]+$', token):
+                self.logger.warning("Supervisor token contains invalid characters")
+                return False
+            
+            # If Home Assistant instance is available, validate against supervisor
+            if self.hass:
+                try:
+                    # Check if token is in HA's supervisor token configuration
+                    supervisor_token = getattr(self.hass.config, 'supervisor_token', None)
+                    if supervisor_token and secrets.compare_digest(token, supervisor_token):
+                        self.logger.debug("Supervisor token validation successful")
+                        return True
+                    else:
+                        self.logger.warning("Supervisor token validation failed - token mismatch")
+                        return False
+                        
+                except Exception as e:
+                    self.logger.error(f"Error accessing HA supervisor token: {e}")
+                    return False
+            
+            # Fallback validation for testing/development environments
+            # Check against environment variable or configuration
+            expected_token = self.config.get('supervisor_token')
+            if expected_token:
+                is_valid = secrets.compare_digest(token, expected_token)
+                if is_valid:
+                    self.logger.debug("Supervisor token validated against configuration")
+                else:
+                    self.logger.warning("Supervisor token validation failed - config mismatch")
+                return is_valid
+            
+            # If no validation method available, reject for security
+            self.logger.warning("No supervisor token validation method available - rejecting token")
+            return False
+            
+        except Exception as e:
+            self.performance_metrics['error_count'] += 1
+            self.logger.error(f"Error validating supervisor token: {e}")
+            return False
+
+    def sanitize_error_message(self, error: Exception, context: str = "") -> str:
+        """
+        Sanitize error messages to remove sensitive information.
+        
+        Critical security function to prevent sensitive data leakage
+        through error messages and logs.
+        
+        Args:
+            error: The exception to sanitize
+            context: Optional context for the error
+            
+        Returns:
+            Sanitized error message safe for logging
+        """
+        try:
+            # Convert error to string
+            error_str = str(error)
+            
+            # List of sensitive patterns to remove/mask
+            sensitive_patterns = [
+                # Passwords and tokens
+                (r'password[=:][\s]*["\']?([^"\'\s]+)["\']?', 'password=***'),
+                (r'token[=:][\s]*["\']?([^"\'\s]+)["\']?', 'token=***'),
+                (r'api[_-]?key[=:][\s]*["\']?([^"\'\s]+)["\']?', 'api_key=***'),
+                (r'secret[=:][\s]*["\']?([^"\'\s]+)["\']?', 'secret=***'),
+                (r'auth[=:][\s]*["\']?([^"\'\s]+)["\']?', 'auth=***'),
+                
+                # Connection strings
+                (r'mysql://[^@]+@', 'mysql://***@'),
+                (r'postgresql://[^@]+@', 'postgresql://***@'),
+                (r'mongodb://[^@]+@', 'mongodb://***@'),
+                
+                # URLs with credentials
+                (r'://[^:]+:[^@]+@', '://***:***@'),
+                
+                # IP addresses (partially mask)
+                (r'\b(\d{1,3}\.)\d{1,3}(\.\d{1,3}\.\d{1,3})\b', r'\1***\2'),
+                
+                # Home paths
+                (r'/home/[^/\s]+', '/home/***'),
+                (r'C:\\Users\\[^\\]+', 'C:\\Users\\***'),
+                
+                # File paths with potential sensitive info
+                (r'/(etc|var|opt)/[^\s]+', '/***'),
+                
+                # Email addresses (partially mask)
+                (r'\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b', r'***@\2'),
+            ]
+            
+            # Apply sanitization patterns
+            sanitized = error_str
+            for pattern, replacement in sensitive_patterns:
+                sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+            
+            # Remove any remaining quoted secrets (anything in quotes that looks sensitive)
+            sanitized = re.sub(r'["\'][^"\']{20,}["\']', '***', sanitized)
+            
+            # Add context if provided
+            if context:
+                sanitized = f"[{context}] {sanitized}"
+            
+            # Ensure message isn't empty
+            if not sanitized.strip():
+                sanitized = "Error occurred (details sanitized)"
+            
+            return sanitized
+            
+        except Exception as sanitize_error:
+            # If sanitization fails, return a generic safe message
+            self.logger.error(f"Error during message sanitization: {sanitize_error}")
+            return f"Error occurred during operation (sanitization failed): {type(error).__name__}"
 
     
     async def cleanup(self) -> None:

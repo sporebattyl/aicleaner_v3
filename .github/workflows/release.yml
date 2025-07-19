@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: aicleaner_v3
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    strategy:
+      matrix:
+        arch: [aarch64, amd64, armv7, armhf, i386]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Get version
+      id: version
+      run: |
+        python -c "import yaml; print('version=' + yaml.safe_load(open('config.yaml'))['version'])" >> $GITHUB_OUTPUT
+        
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/${{ matrix.arch == 'amd64' && 'amd64' || matrix.arch == 'aarch64' && 'arm64' || matrix.arch == 'armv7' && 'arm/v7' || matrix.arch == 'armhf' && 'arm/v6' || matrix.arch == 'i386' && '386' }}
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-${{ matrix.arch }}:${{ steps.version.outputs.version }}
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-${{ matrix.arch }}:latest
+        build-args: |
+          BUILD_ARCH=${{ matrix.arch }}
+          BUILD_VERSION=${{ steps.version.outputs.version }}
+          BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          VCS_REF=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  validate-docker:
+    name: Validate Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run Docker validation script
+      run: |
+        chmod +x scripts/validate-docker.sh
+        ./scripts/validate-docker.sh ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-amd64:latest
+
+  create-manifest:
+    name: Create Manifest
+    runs-on: ubuntu-latest
+    needs: [build, validate-docker]
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Get version
+      id: version
+      run: |
+        python -c "import yaml; print('version=' + yaml.safe_load(open('config.yaml'))['version'])" >> $GITHUB_OUTPUT
+        
+    - name: Create and push manifest
+      run: |
+        docker manifest create \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-aarch64:${{ steps.version.outputs.version }} \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-amd64:${{ steps.version.outputs.version }} \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-armv7:${{ steps.version.outputs.version }} \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-armhf:${{ steps.version.outputs.version }} \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-i386:${{ steps.version.outputs.version }}
+        docker manifest push ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+        
+        docker manifest create \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-aarch64:latest \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-amd64:latest \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-armv7:latest \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-armhf:latest \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}-i386:latest
+        docker manifest push ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [create-manifest]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Get version and changelog
+      id: release-info
+      run: |
+        VERSION=$(python -c "import yaml; print(yaml.safe_load(open('config.yaml'))['version'])")
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        
+        if [ -f "CHANGELOG.md" ]; then
+          CHANGELOG=$(sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | head -n -1)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.release-info.outputs.version }}
+        release_name: AICleaner v3 ${{ steps.release-info.outputs.version }}
+        body: |
+          ${{ steps.release-info.outputs.changelog }}
+          
+          ## Docker Images
+          
+          Multi-architecture images are available at:
+          - `${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.release-info.outputs.version }}`
+          - `${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest`
+          
+          See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+        draft: false
+        prerelease: false

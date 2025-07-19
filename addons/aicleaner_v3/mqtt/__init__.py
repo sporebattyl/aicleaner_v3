@@ -1,15 +1,13 @@
 """
-MQTT components for the AI Cleaner addon.
+MQTT Integration Module
+Phase 4B: MQTT Discovery System
 
-This package contains MQTT-related functionality including:
-- MQTT client
-- MQTT entities
+This module provides MQTT adapter functionality for Home Assistant integration
+through MQTT Discovery protocol. Maintains clean separation from core systems
+using the established adapter pattern.
 """
 
-from .mqtt_client import MQTTClient
-from .mqtt_entities import MQTTEntityTemplates
+from .adapter import MQTTAdapter
+from .config import MQTTConfig
 
-__all__ = [
-    'MQTTClient',
-    'MQTTEntityTemplates'
-]
+__all__ = ['MQTTAdapter', 'MQTTConfig']

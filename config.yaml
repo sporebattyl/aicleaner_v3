@@ -1,8 +1,8 @@
 name: "AICleaner v3"
-version: "3.0.0"
+version: "1.0.0"
 slug: "aicleaner_v3"
 description: "Advanced AI-powered Home Assistant automation with intelligent device management"
-url: "https://github.com/yourusername/aicleaner_v3"
+url: "https://github.com/drewcifer/aicleaner_v3"
 arch:
   - aarch64
   - amd64
@@ -10,18 +10,21 @@ arch:
   - armv7
   - i386
 init: false
-privileged:
-  - SYS_ADMIN
 map:
   - config:rw
-  - ssl:rw
-  - addons_config:rw
-  - share:rw
-  - media:rw
+  - ssl
+  - share
+  - media
 ports:
   8000/tcp: 8000
 ports_description:
-  8000/tcp: "AICleaner Web Interface"
+  8000/tcp: "AICleaner Web Interface (Not required for Ingress)"
+webui: "http://[HOST]:[PORT:8000]"
+ingress: true
+ingress_port: 8000
+ingress_stream: false
+panel_icon: mdi:robot-intelligent
+panel_title: AICleaner v3
 options:
   log_level: info
   ai_providers:
@@ -41,6 +44,28 @@ options:
     auto_optimization: true
     resource_monitoring: true
     caching: true
+  ha:
+    enabled: true
+    service_domain: aicleaner
+    websocket_url: ws://supervisor/core/websocket
+    rest_api_url: http://supervisor/core/api
+    register_services: true
+    entity_prefix: aicleaner_
+    device_name: "AICleaner Main Unit"
+    update_interval: 30
+    auto_register_entities: true
+  mqtt:
+    enabled: true
+    broker_host: core-mosquitto
+    broker_port: 1883
+    username: ""
+    password: ""
+    discovery_prefix: homeassistant
+    device_id: aicleaner_v3
+    device_name: "AICleaner v3"
+    qos_discovery: 1
+    qos_state: 1
+    retain_discovery: true
   privacy:
     enabled: true
     level: "balanced"
@@ -67,17 +92,17 @@ schema:
   ai_providers:
     - provider: str
       enabled: bool
-      api_key: password?
+      api_key: password
       model: str?
-      max_tokens: int?
+      max_tokens: int(500, 8000)?
   zones:
     - name: str
       enabled: bool
-      devices: [str]
-      automation_rules: [str]?
+      devices: "[str]?"
+      automation_rules: "[str]?"
   security:
     enabled: bool
-    encryption: bool
+    encryption: bool?
     audit_logging: bool
     ssl_certificate: str?
     ssl_key: str?
@@ -85,42 +110,60 @@ schema:
     auto_optimization: bool
     resource_monitoring: bool
     caching: bool
-    max_memory_mb: int?
-    max_cpu_percent: int?
+    max_memory_mb: int(256, 4096)?
+    max_cpu_percent: int(20, 95)?
+  ha:
+    enabled: bool
+    service_domain: str
+    websocket_url: str
+    rest_api_url: str
+    register_services: bool
+    entity_prefix: str?
+    device_name: str?
+    update_interval: int(10, 300)?
+    auto_register_entities: bool?
+  mqtt:
+    enabled: bool
+    broker_host: str?
+    broker_port: int(1, 65535)?
+    username: str?
+    password: password?
+    discovery_prefix: str?
+    device_id: str?
+    device_name: str?
+    qos_discovery: int(0, 2)?
+    qos_state: int(0, 2)?
+    retain_discovery: bool?
   privacy:
     enabled: bool
     level: list(speed|balanced|paranoid)
     models:
       face_detection:
-        speed: str
-        balanced: str
-        paranoid: str
+        speed: str?
+        balanced: str?
+        paranoid: str?
       object_detection:
-        general: str
-        license_plates: str
-      text_detection: str
+        general: str?
+        license_plates: str?
+      text_detection: str?
     redaction:
-      face_mode: list(blur|pixelate|black_box)
-      license_plate_mode: list(blur|pixelate|black_box)
-      pii_text_mode: list(blur|pixelate|black_box)
+      face_mode: list(blur|pixelate|black_box)?
+      license_plate_mode: list(blur|pixelate|black_box)?
+      pii_text_mode: list(blur|pixelate|black_box)?
     performance:
-      max_image_size: [int]
-      parallel_processing: bool
-      model_caching: bool
-      async_processing: bool
-image: "ghcr.io/yourusername/aicleaner_v3"
+      max_image_size: "[int]?"
+      parallel_processing: bool?
+      model_caching: bool?
+      async_processing: bool?
+image: "ghcr.io/drewcifer/aicleaner_v3-{arch}"
 services:
-  - mqtt:server
-  - mysql:want
+  - mqtt:want
 startup: application
 boot: auto
 hassio_api: true
-hassio_role: admin
+hassio_role: default
 homeassistant_api: true
 host_network: false
 auto_uart: false
-devices:
-  - /dev/ttyUSB0
-  - /dev/ttyACM0
-udev: true
 apparmor: true
+backup: full

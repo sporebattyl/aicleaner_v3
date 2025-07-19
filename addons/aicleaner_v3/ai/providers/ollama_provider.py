@@ -28,6 +28,9 @@ from .base_provider import (
 from .rate_limiter import RateLimiter, RateLimitConfig
 from .health_monitor import HealthMonitor
 
+# Performance optimization - Phase 5A
+from performance.ai_cache import get_ai_cache
+
 
 class OllamaProvider(BaseAIProvider):
     """
@@ -153,8 +156,30 @@ class OllamaProvider(BaseAIProvider):
         return self.status
     
     async def process_request(self, request: AIRequest) -> AIResponse:
-        """Process AI request"""
+        """Process AI request with caching"""
         start_time = time.time()
+        
+        # Check cache first - Phase 5A
+        cache = get_ai_cache()
+        cached_response = await cache.get("ollama", self.model_name, request.prompt, {
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "has_image": bool(request.image_path or request.image_data)
+        })
+        
+        if cached_response:
+            self.logger.debug(f"Cache hit for Ollama request: {request.request_id}")
+            return AIResponse(
+                request_id=request.request_id,
+                response_text=cached_response["response_text"],
+                model_used=cached_response["model_used"],
+                provider="ollama",
+                confidence=cached_response.get("confidence", 0.9),
+                cost=0.0,  # No cost for cached response (local model)
+                response_time=time.time() - start_time,
+                cached=True,
+                metadata=cached_response.get("metadata", {})
+            )
         
         try:
             # Prepare request payload
@@ -234,6 +259,19 @@ class OllamaProvider(BaseAIProvider):
                     "base_url": self.base_url
                 }
             )
+            
+            # Cache successful response - Phase 5A
+            cache_data = {
+                "response_text": response_text,
+                "model_used": self.model_name,
+                "confidence": 0.9,
+                "metadata": ai_response.metadata
+            }
+            await cache.set("ollama", self.model_name, request.prompt, cache_data, {
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "has_image": bool(request.image_path or request.image_data)
+            })
             
             self.logger.debug(f"Ollama request completed: {request.request_id}")
             return ai_response

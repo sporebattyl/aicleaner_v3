@@ -7,7 +7,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import { CSVLink } from 'react-csv';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { ApiService } from '../services/ApiService';
+import ApiService from '../services/ApiService';
 import { useAccessibility } from '../utils/AccessibilityManager';
 
 // Register Chart.js components

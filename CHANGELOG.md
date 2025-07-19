@@ -1,7 +1,12 @@
 # Changelog
 All notable changes to AICleaner v3 will be documented in this file.
 
-## [3.0.0] - 2025-07-16
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.0] - 2025-01-19
 ### Added
 - Multi-AI provider support (OpenAI, Gemini, Claude)
 - Intelligent zone management with ML optimization
@@ -57,13 +62,3 @@ All notable changes to AICleaner v3 will be documented in this file.
 - I/O scheduling and throttling
 - Network bandwidth management
 
-## [2.0.0] - Previous Version
-### Legacy Features
-- Basic AI integration
-- Simple device management
-- Basic automation rules
-
-## [1.0.0] - Initial Release
-### Initial Features
-- Basic Home Assistant integration
-- Simple automation capabilities

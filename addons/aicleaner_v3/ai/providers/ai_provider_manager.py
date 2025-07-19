@@ -25,6 +25,7 @@ from .ollama_provider import OllamaProvider
 from .llamacpp_amd_provider import LlamaCppAMDProvider
 from .credential_manager import CredentialManager
 from .health_monitor import HealthMonitor
+from .load_balancer import LoadBalancer, LoadBalancingStrategy, create_single_user_load_balancer
 
 
 class ProviderSelectionStrategy(Enum):
@@ -81,8 +82,9 @@ class AIProviderManager:
             "llamacpp_amd": LlamaCppAMDProvider
         }
         
-        # Simplified routing - priority-based only
-        self.selection_strategy = ProviderSelectionStrategy.PRIORITY_BASED
+        # Advanced load balancing
+        manager_config = config.get("ai_provider_manager", {})
+        self.load_balancer = create_single_user_load_balancer(manager_config)
         
         # Performance tracking
         self.request_history: List[Dict[str, Any]] = []
@@ -92,9 +94,6 @@ class AIProviderManager:
         
         # Health monitoring
         self.health_monitor = HealthMonitor("ai_provider_manager", config)
-        
-        # Circuit breaker state
-        self.circuit_breakers: Dict[str, Dict[str, Any]] = {}
         
         
         # Load provider configurations during initialization
@@ -178,14 +177,8 @@ class AIProviderManager:
                     self.providers[provider_name] = provider
                     self.logger.info(f"Successfully initialized provider: {provider_name}")
                     
-                    # Initialize circuit breaker with faster recovery
-                    self.circuit_breakers[provider_name] = {
-                        "state": "closed",
-                        "failure_count": 0,
-                        "last_failure": None,
-                        "timeout": 30,  # Faster recovery: 30 seconds
-                        "max_failures": 3  # Faster circuit opening: 3 failures
-                    }
+                    # Register with load balancer
+                    self.load_balancer.register_provider(provider_name)
                     
                     
                 else:
@@ -238,60 +231,22 @@ class AIProviderManager:
             )
     
     async def _select_provider(self, request: AIRequest) -> Optional[BaseAIProvider]:
-        """Select the best provider for the request with enhanced routing logic"""
+        """Select the best provider for the request using advanced load balancing"""
+        # Use the advanced load balancer for provider selection
+        selected_provider_name = self.load_balancer.select_provider(self.providers, request)
+        
+        if selected_provider_name and selected_provider_name in self.providers:
+            provider = self.providers[selected_provider_name]
+            self.logger.debug(f"Load balancer selected provider: {selected_provider_name}")
+            return provider
+        
+        # Fallback to simple priority-based selection if load balancer fails
         available_providers = self._get_available_providers()
+        if available_providers:
+            self.logger.warning("Load balancer failed, falling back to priority-based selection")
+            return self._select_priority_based(available_providers)
         
-        if not available_providers:
-            return None
-        
-        # Enhanced routing logic
-        
-        # 1. Privacy-first routing - prefer local providers for sensitive requests
-        privacy_mode = request.context and request.context.get("privacy_mode", False)
-        if privacy_mode:
-            local_providers = [p for p in available_providers if p in ["ollama", "llamacpp_amd"]]
-            if local_providers:
-                self.logger.info("Privacy mode enabled - using local providers only")
-                available_providers = local_providers
-        
-        # 2. Vision request routing with local preference
-        if request.image_path or request.image_data:
-            # Check if local vision models are available first
-            local_vision_providers = [p for p in available_providers if p == "llamacpp_amd" and 
-                                    self.providers[p].capabilities.get("vision", False)]
-            
-            if local_vision_providers:
-                # Prefer local vision models for privacy and cost
-                available_providers = local_vision_providers
-                self.logger.info("Using local vision model for image analysis")
-            else:
-                # Fallback to cloud vision providers
-                cloud_vision_providers = [p for p in available_providers if p in ["google", "openai"]]
-                if cloud_vision_providers:
-                    available_providers = cloud_vision_providers
-                    self.logger.info("Falling back to cloud vision providers")
-        
-        # 3. Performance-based local preference for text-only requests
-        elif not (request.image_path or request.image_data):
-            # For text-only requests, prefer local providers if they meet performance requirements
-            local_providers = [p for p in available_providers if p in ["llamacpp_amd", "ollama"]]
-            
-            # Check if local providers can handle the request efficiently
-            if local_providers and not self._is_complex_request(request):
-                # Use local providers for simple to moderate complexity requests
-                available_providers = local_providers
-                self.logger.debug("Using local providers for text-only request")
-        
-        # 4. Code generation preference
-        if self._is_code_request(request.prompt):
-            # Prefer providers with strong code generation capabilities
-            code_providers = [p for p in available_providers if 
-                            self.providers[p].capabilities.get("code_generation", False)]
-            if code_providers:
-                available_providers = code_providers
-        
-        # Use enhanced priority-based selection
-        return self._select_priority_based_enhanced(available_providers, request)
+        return None
     
     def _get_available_providers(self) -> List[str]:
         """Get list of available providers"""
@@ -396,18 +351,29 @@ class AIProviderManager:
     
     async def _process_with_provider(self, provider: BaseAIProvider, 
                                   request: AIRequest) -> AIResponse:
-        """Process request with specific provider"""
+        """Process request with specific provider and track metrics"""
+        start_time = time.time()
+        provider_name = provider.config.name
+        
         try:
             response = await provider.process_request_with_retry(request)
             
-            # Update circuit breaker on success
-            self._update_circuit_breaker(provider.config.name, success=True)
+            # Calculate metrics
+            response_time = time.time() - start_time
+            success = not response.error
+            cost = response.cost
+            
+            # Update load balancer metrics
+            self.load_balancer.update_provider_metrics(provider_name, success, response_time, cost)
             
             return response
             
         except AIProviderError as e:
-            # Update circuit breaker on failure
-            self._update_circuit_breaker(provider.config.name, success=False)
+            # Calculate metrics for failed request
+            response_time = time.time() - start_time
+            
+            # Update load balancer metrics
+            self.load_balancer.update_provider_metrics(provider_name, False, response_time, 0.0)
             
             # Try fallback if available
             if e.retryable:
@@ -514,17 +480,24 @@ class AIProviderManager:
     
     
     def get_provider_status(self) -> Dict[str, Any]:
-        """Get status of all providers"""
+        """Get status of all providers with load balancer and ML model metrics"""
         status = {}
         
         for provider_name, provider in self.providers.items():
+            # Get load balancer stats for this provider
+            lb_stats = self.load_balancer.get_provider_stats(provider_name)
+            
+            # Get ML model stats if available
+            ml_stats = provider.get_ml_model_stats()
+            
             status[provider_name] = {
                 "status": provider.get_status().value,
                 "health": provider.is_healthy(),
                 "available": provider.is_available(),
                 "active_requests": provider.get_active_requests(),
                 "metrics": provider.get_metrics().__dict__,
-                "circuit_breaker": self.circuit_breakers.get(provider_name, {})
+                "load_balancer_stats": lb_stats,
+                "ml_model_stats": ml_stats
             }
         
         return status
@@ -573,6 +546,10 @@ class AIProviderManager:
                 health_report["overall_health"] = "degraded"
         
         return health_report
+    
+    def get_load_balancer_stats(self) -> Dict[str, Any]:
+        """Get overall load balancer statistics"""
+        return self.load_balancer.get_load_balancer_stats()
     
     async def shutdown(self):
         """Shutdown all providers and manager"""

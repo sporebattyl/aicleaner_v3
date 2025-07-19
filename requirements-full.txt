@@ -1,0 +1,19 @@
+# Full Dependencies for AICleaner v3 (includes optional features)
+
+# Core Dependencies
+-r requirements-core.txt
+
+# Privacy Pipeline Dependencies (Optional)
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+torch>=2.0.0
+torchvision>=0.15.0
+onnxruntime>=1.16.0
+
+# AMD Optimization Dependencies (Optional)
+llama-cpp-python[opencl]>=0.2.0
+GPUtil>=1.4.0
+
+# Caching (Optional)
+redis>=5.0.0

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { ApiService } from '../services/ApiService';
+import ApiService from '../services/ApiService';
 
 export const ConfigurationManager = () => {
     const [config, setConfig] = useState({});

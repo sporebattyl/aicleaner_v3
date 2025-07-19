@@ -1,7 +1,7 @@
 
-"""
-WebSocket Service for Real-time Updates
-"""
+/**
+ * WebSocket Service for Real-time Updates
+ */
 
 class WebSocketService {
     constructor() {
@@ -103,4 +103,4 @@ class WebSocketService {
     }
 }
 
-export const WebSocketService = new WebSocketService();
+export default new WebSocketService();

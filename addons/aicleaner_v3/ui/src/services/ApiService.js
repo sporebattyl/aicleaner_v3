@@ -1,11 +1,14 @@
 
-"""
-API Service for HTTP requests
-"""
+/**
+ * API Service for HTTP requests
+ * Phase 4A: Enhanced Home Assistant Integration - Ingress Compatible
+ */
+
+import { getApiBaseUrl } from '../utils/ingress';
 
 class ApiService {
     constructor() {
-        this.baseURL = window.location.origin;
+        this.baseURL = getApiBaseUrl(); // Use ingress-aware base URL
     }
 
     async request(endpoint, options = {}) {
@@ -104,4 +107,4 @@ class ApiService {
     }
 }
 
-export const ApiService = new ApiService();
+export default new ApiService();

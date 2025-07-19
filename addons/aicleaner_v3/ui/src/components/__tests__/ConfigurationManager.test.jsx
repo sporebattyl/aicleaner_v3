@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigurationManager } from '../ConfigurationManager';
-import { ApiService } from '../../services/ApiService';
+import ApiService from '../../services/ApiService';
 
 // Mock ApiService
 jest.mock('../../services/ApiService');

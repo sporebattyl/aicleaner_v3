@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { Card, Form, Button, Alert, Modal, Badge } from 'react-bootstrap';
-import { ApiService } from '../services/ApiService';
+import ApiService from '../services/ApiService';
 
 // Authentication Context
 const AuthContext = createContext();

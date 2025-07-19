@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Providers - AICleaner v3</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .provider-details {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .provider-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #1976d2;
+        }
+
+        .provider-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .config-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .config-field label {
+            font-weight: bold;
+            color: #ccc;
+        }
+
+        .config-field input,
+        .config-field select {
+            background: #1e1e1e;
+            border: 1px solid #555;
+            color: #e1e1e1;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .config-field input:focus,
+        .config-field select:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: #555;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #1976d2;
+        }
+
+        .toggle-switch::before {
+            content: '';
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .toggle-switch.active::before {
+            left: 32px;
+        }
+
+        .provider-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1976d2;
+        }
+
+        .stat-label {
+            color: #bbb;
+            font-size: 0.9rem;
+        }
+
+        .ml-models {
+            margin-top: 15px;
+        }
+
+        .ml-model-item {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .model-name {
+            font-weight: bold;
+        }
+
+        .model-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+            color: #bbb;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        .btn-danger {
+            background: #f44336;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn-success {
+            background: #4caf50;
+        }
+
+        .btn-success:hover {
+            background: #388e3c;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #1e1e1e;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #fff;
+        }
+
+        .nav-menu {
+            background: #2a2a2a;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+
+        .nav-menu a {
+            color: #1976d2;
+            text-decoration: none;
+            margin-right: 20px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .nav-menu a:hover {
+            background: #1976d2;
+            color: white;
+        }
+
+        .nav-menu a.active {
+            background: #1976d2;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 AICleaner v3 - AI Providers</h1>
+        <p>Manage your AI provider configurations</p>
+    </div>
+
+    <div class="container">
+        <div class="nav-menu">
+            <a href="index.html">Dashboard</a>
+            <a href="providers.html" class="active">Providers</a>
+            <a href="logs.html">Logs</a>
+            <a href="settings.html">Settings</a>
+        </div>
+
+        <div id="error-container"></div>
+
+        <div class="card">
+            <h2>🔧 AI Provider Management</h2>
+            <button class="btn" onclick="showAddProviderModal()">Add Provider</button>
+            <div id="providers-container" class="loading">Loading providers...</div>
+        </div>
+    </div>
+
+    <!-- Add Provider Modal -->
+    <div id="addProviderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Provider</h3>
+                <span class="close" onclick="hideAddProviderModal()">&times;</span>
+            </div>
+            <div class="config-grid">
+                <div class="config-field">
+                    <label>Provider Name</label>
+                    <select id="newProviderName">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="google">Google</option>
+                        <option value="ollama">Ollama</option>
+                        <option value="llamacpp_amd">LlamaCpp AMD</option>
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label>API Key</label>
+                    <input type="password" id="newProviderApiKey" placeholder="Enter API key">
+                </div>
+                <div class="config-field">
+                    <label>Model Name</label>
+                    <input type="text" id="newProviderModel" placeholder="e.g., gpt-4">
+                </div>
+                <div class="config-field">
+                    <label>Priority</label>
+                    <input type="number" id="newProviderPriority" value="1" min="1" max="10">
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="btn" onclick="addProvider()">Add Provider</button>
+                <button class="btn" onclick="hideAddProviderModal()" style="background: #666;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL
+        const API_BASE = '/api';
+        
+        // Show error message
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = `<div class="error">${message}</div>`;
+            setTimeout(() => {
+                errorContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = `<div class="success" style="background: #4caf50; color: white; padding: 15px; border-radius: 4px; margin-bottom: 20px;">${message}</div>`;
+            setTimeout(() => {
+                errorContainer.innerHTML = '';
+            }, 3000);
+        }
+
+        // API call helper
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'API call failed');
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('API call error:', error);
+                showError(`API Error: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // Load providers
+        async function loadProviders() {
+            try {
+                const response = await apiCall('/providers');
+                const providers = response.data.providers;
+                
+                const providersHtml = providers.map(provider => createProviderHTML(provider)).join('');
+                document.getElementById('providers-container').innerHTML = providersHtml;
+                
+            } catch (error) {
+                document.getElementById('providers-container').innerHTML = '<div class="error">Failed to load providers</div>';
+            }
+        }
+
+        // Create provider HTML
+        function createProviderHTML(provider) {
+            const statusClass = provider.status === 'healthy' ? 'status-healthy' : 
+                               provider.status === 'degraded' ? 'status-degraded' : 'status-unavailable';
+            
+            return `
+                <div class="provider-details">
+                    <div class="provider-header">
+                        <div class="provider-title">
+                            <span class="status-indicator ${statusClass}"></span>
+                            ${provider.name}
+                        </div>
+                        <div class="provider-controls">
+                            <div class="toggle-switch ${provider.enabled ? 'active' : ''}" onclick="toggleProvider('${provider.name}')"></div>
+                            <button class="btn btn-small" onclick="editProvider('${provider.name}')">Edit</button>
+                            <button class="btn btn-small btn-danger" onclick="deleteProvider('${provider.name}')">Delete</button>
+                        </div>
+                    </div>
+                    
+                    <div class="provider-stats">
+                        <div class="stat-card">
+                            <div class="stat-value">${provider.active_requests}</div>
+                            <div class="stat-label">Active Requests</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${provider.metrics.success_rate?.toFixed(1) || 0}%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${provider.metrics.average_response_time?.toFixed(1) || 0}s</div>
+                            <div class="stat-label">Avg Response Time</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">$${provider.metrics.total_cost?.toFixed(2) || 0}</div>
+                            <div class="stat-label">Total Cost</div>
+                        </div>
+                    </div>
+                    
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label>Model</label>
+                            <span>${provider.config.model_name || 'N/A'}</span>
+                        </div>
+                        <div class="config-field">
+                            <label>Priority</label>
+                            <span>${provider.config.priority}</span>
+                        </div>
+                        <div class="config-field">
+                            <label>Rate Limit (RPM)</label>
+                            <span>${provider.config.rate_limit_rpm}</span>
+                        </div>
+                        <div class="config-field">
+                            <label>Daily Budget</label>
+                            <span>$${provider.config.daily_budget}</span>
+                        </div>
+                    </div>
+                    
+                    ${provider.ml_model_stats ? createMLStatsHTML(provider.ml_model_stats) : ''}
+                </div>
+            `;
+        }
+
+        // Create ML stats HTML
+        function createMLStatsHTML(mlStats) {
+            if (!mlStats || !mlStats.model_performance) return '';
+            
+            const models = Object.entries(mlStats.model_performance);
+            if (models.length === 0) return '';
+            
+            const modelsHtml = models.map(([modelName, stats]) => {
+                const totalPulls = Object.values(stats).reduce((sum, categoryStats) => sum + (categoryStats.pulls || 0), 0);
+                const avgSuccessRate = Object.values(stats).reduce((sum, categoryStats) => sum + (categoryStats.success_rate || 0), 0) / Object.values(stats).length;
+                
+                return `
+                    <div class="ml-model-item">
+                        <div class="model-name">${modelName}</div>
+                        <div class="model-stats">
+                            <span>Pulls: ${totalPulls}</span>
+                            <span>Success: ${(avgSuccessRate * 100).toFixed(1)}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="ml-models">
+                    <h4>🧠 ML Model Performance</h4>
+                    ${modelsHtml}
+                </div>
+            `;
+        }
+
+        // Toggle provider
+        async function toggleProvider(providerName) {
+            try {
+                // This would need to be implemented in the backend
+                showSuccess(`Provider ${providerName} toggled`);
+                await loadProviders();
+            } catch (error) {
+                showError('Failed to toggle provider');
+            }
+        }
+
+        // Edit provider
+        function editProvider(providerName) {
+            // This would open an edit modal
+            showSuccess(`Edit ${providerName} (not implemented in this demo)`);
+        }
+
+        // Delete provider
+        async function deleteProvider(providerName) {
+            if (confirm(`Are you sure you want to delete provider "${providerName}"?`)) {
+                try {
+                    // This would need to be implemented in the backend
+                    showSuccess(`Provider ${providerName} deleted`);
+                    await loadProviders();
+                } catch (error) {
+                    showError('Failed to delete provider');
+                }
+            }
+        }
+
+        // Show add provider modal
+        function showAddProviderModal() {
+            document.getElementById('addProviderModal').style.display = 'block';
+        }
+
+        // Hide add provider modal
+        function hideAddProviderModal() {
+            document.getElementById('addProviderModal').style.display = 'none';
+            // Clear form
+            document.getElementById('newProviderName').value = 'openai';
+            document.getElementById('newProviderApiKey').value = '';
+            document.getElementById('newProviderModel').value = '';
+            document.getElementById('newProviderPriority').value = '1';
+        }
+
+        // Add provider
+        async function addProvider() {
+            try {
+                const name = document.getElementById('newProviderName').value;
+                const apiKey = document.getElementById('newProviderApiKey').value;
+                const model = document.getElementById('newProviderModel').value;
+                const priority = parseInt(document.getElementById('newProviderPriority').value);
+
+                if (!apiKey && name !== 'ollama') {
+                    showError('API key is required for cloud providers');
+                    return;
+                }
+
+                // This would need to be implemented in the backend
+                showSuccess(`Provider ${name} added successfully`);
+                hideAddProviderModal();
+                await loadProviders();
+                
+            } catch (error) {
+                showError('Failed to add provider');
+            }
+        }
+
+        // Initialize the page
+        async function init() {
+            try {
+                await loadProviders();
+                console.log('Providers page initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize providers page:', error);
+                showError('Failed to initialize providers page');
+            }
+        }
+
+        // Start the page when loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

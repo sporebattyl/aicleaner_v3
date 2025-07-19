@@ -1,0 +1,38 @@
+{
+  "ai": {
+    "providers": {
+      "primary": {
+        "name": "openai",
+        "enabled": true
+      },
+      "secondary": {
+        "name": "anthropic",
+        "enabled": true
+      }
+    },
+    "failover_enabled": true
+  },
+  "mqtt": {
+    "broker_address": "localhost",
+    "broker_port": 1883,
+    "use_tls": false,
+    "discovery_prefix": "homeassistant",
+    "qos": 1
+  },
+  "security": {
+    "supervisor_token_valid": true,
+    "authentication_enabled": true,
+    "threat_detection_enabled": true,
+    "audit_logging": true,
+    "ssl_required": false
+  },
+  "zones": [
+    {
+      "id": "zone_1",
+      "name": "Living Room",
+      "description": "Main living area",
+      "automation_enabled": true,
+      "devices": []
+    }
+  ]
+}

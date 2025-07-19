@@ -21,6 +21,10 @@ from .base_provider import (
 )
 from .rate_limiter import RateLimiter, RateLimitConfig
 from .health_monitor import HealthMonitor
+from .ml_model_selector import MLModelSelector
+
+# Performance optimization - Phase 5A
+from performance.ai_cache import get_ai_cache
 
 try:
     import openai
@@ -65,6 +69,22 @@ class OpenAIProvider(BaseAIProvider):
         self.model_name = config.model_name or "gpt-4-vision-preview"
         self.max_tokens = 4000
         self.temperature = 0.1
+        
+        # Available models for ML selection
+        self.available_models = [
+            "gpt-4o",
+            "gpt-4o-mini", 
+            "gpt-4-turbo",
+            "gpt-4-vision-preview"
+        ]
+        self.default_model = "gpt-4o-mini"
+        
+        # Initialize ML model selector
+        self.ml_model_selector = MLModelSelector(
+            provider_name="openai",
+            models=self.available_models,
+            default_model=self.default_model
+        )
         
         # Rate limiter
         rate_config = RateLimitConfig(
@@ -162,10 +182,37 @@ class OpenAIProvider(BaseAIProvider):
         return self.status
     
     async def process_request(self, request: AIRequest) -> AIResponse:
-        """Process AI request"""
+        """Process AI request with ML model selection and caching"""
         start_time = time.time()
         
+        # Get ML-recommended model
+        recommended_model = self.get_recommended_model(request)
+        model_to_use = recommended_model if recommended_model else self.model_name
+        
+        # Check cache first - Phase 5A
+        cache = get_ai_cache()
+        cached_response = await cache.get("openai", model_to_use, request.prompt, {
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "has_image": bool(request.image_path or request.image_data)
+        })
+        
+        if cached_response:
+            self.logger.debug(f"Cache hit for OpenAI request: {request.request_id}")
+            return AIResponse(
+                request_id=request.request_id,
+                response_text=cached_response["response_text"],
+                model_used=cached_response["model_used"],
+                provider="openai",
+                confidence=cached_response.get("confidence", 0.9),
+                cost=0.0,  # No cost for cached response
+                response_time=time.time() - start_time,
+                cached=True,
+                metadata=cached_response.get("metadata", {})
+            )
+        
         try:
+            
             # Prepare messages
             messages = self._prepare_messages(request)
             
@@ -182,9 +229,9 @@ class OpenAIProvider(BaseAIProvider):
                     retryable=True
                 )
             
-            # Make API call
+            # Make API call with selected model
             response = await self.async_client.chat.completions.create(
-                model=self.model_name,
+                model=model_to_use,
                 messages=messages,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
@@ -214,11 +261,14 @@ class OpenAIProvider(BaseAIProvider):
                 error=False
             )
             
+            # Update ML model performance
+            self.update_model_performance(model_to_use, request, True, response_time, cost)
+            
             # Create response
             ai_response = AIResponse(
                 request_id=request.request_id,
                 response_text=response_text,
-                model_used=self.model_name,
+                model_used=model_to_use,
                 provider="openai",
                 confidence=0.9,  # OpenAI doesn't provide confidence scores
                 cost=cost,
@@ -229,15 +279,33 @@ class OpenAIProvider(BaseAIProvider):
                         "completion_tokens": usage.completion_tokens,
                         "total_tokens": usage.total_tokens
                     },
-                    "finish_reason": response.choices[0].finish_reason
+                    "finish_reason": response.choices[0].finish_reason,
+                    "ml_recommended_model": recommended_model
                 }
             )
             
-            self.logger.debug(f"OpenAI request completed: {request.request_id}")
+            # Cache successful response - Phase 5A
+            cache_data = {
+                "response_text": response_text,
+                "model_used": model_to_use,
+                "confidence": 0.9,
+                "metadata": ai_response.metadata
+            }
+            await cache.set("openai", model_to_use, request.prompt, cache_data, {
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "has_image": bool(request.image_path or request.image_data)
+            })
+            
+            self.logger.debug(f"OpenAI request completed: {request.request_id} with model: {model_to_use}")
             return ai_response
             
         except openai.AuthenticationError as e:
             self.status = AIProviderStatus.AUTHENTICATION_ERROR
+            # Update ML model performance for failed request
+            response_time = time.time() - start_time
+            self.update_model_performance(model_to_use, request, False, response_time, 0.0)
+            
             raise AIProviderError(
                 "Authentication failed",
                 error_code="AUTHENTICATION_ERROR",
@@ -248,6 +316,10 @@ class OpenAIProvider(BaseAIProvider):
             
         except openai.RateLimitError as e:
             self.status = AIProviderStatus.RATE_LIMITED
+            # Update ML model performance for failed request
+            response_time = time.time() - start_time
+            self.update_model_performance(model_to_use, request, False, response_time, 0.0)
+            
             raise AIProviderError(
                 "Rate limit exceeded",
                 error_code="RATE_LIMIT_EXCEEDED",
@@ -257,6 +329,10 @@ class OpenAIProvider(BaseAIProvider):
             )
             
         except openai.APITimeoutError as e:
+            # Update ML model performance for failed request
+            response_time = time.time() - start_time
+            self.update_model_performance(model_to_use, request, False, response_time, 0.0)
+            
             raise AIProviderError(
                 "Request timeout",
                 error_code="TIMEOUT",
@@ -267,11 +343,15 @@ class OpenAIProvider(BaseAIProvider):
             
         except Exception as e:
             # Record error for health monitoring
+            response_time = time.time() - start_time
             self._health_monitor.record_performance(
-                response_time=time.time() - start_time,
+                response_time=response_time,
                 cost=0.0,
                 error=True
             )
+            
+            # Update ML model performance for failed request
+            self.update_model_performance(model_to_use, request, False, response_time, 0.0)
             
             raise AIProviderError(
                 f"OpenAI request failed: {str(e)}",

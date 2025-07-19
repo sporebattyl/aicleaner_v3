@@ -17,6 +17,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from PIL import Image
+from .ml_model_selector import MLModelSelector
 
 
 class AIProviderStatus(Enum):
@@ -148,6 +149,9 @@ class BaseAIProvider(ABC):
         # Request tracking
         self._active_requests: Dict[str, float] = {}
         self._request_queue: List[AIRequest] = []
+        
+        # ML model selector (initialized by subclasses if they support multiple models)
+        self.ml_model_selector: Optional[MLModelSelector] = None
         
         self.logger.info(f"Initialized AI provider: {config.name}")
     
@@ -411,6 +415,18 @@ class BaseAIProvider(ABC):
         """Get number of active requests"""
         return len(self._active_requests)
     
+    def increment_active_requests(self):
+        """Increment the count of active requests."""
+        request_id = f"req_{time.time()}_{len(self._active_requests)}"
+        self._active_requests[request_id] = time.time()
+    
+    def decrement_active_requests(self):
+        """Decrement the count of active requests."""
+        if self._active_requests:
+            # Remove the oldest request key to decrement the count
+            oldest_key = min(self._active_requests, key=self._active_requests.get)
+            del self._active_requests[oldest_key]
+    
     def is_healthy(self) -> bool:
         """Check if provider is healthy"""
         return self.status == AIProviderStatus.HEALTHY
@@ -431,6 +447,47 @@ class BaseAIProvider(ABC):
             "cost_per_request": self.metrics.total_cost / max(1, self.metrics.total_requests),
             "budget_utilization": (self.metrics.total_cost / self.config.daily_budget) * 100
         }
+    
+    def get_recommended_model(self, request: AIRequest) -> Optional[str]:
+        """Get ML-recommended model for request"""
+        if self.ml_model_selector:
+            try:
+                return self.ml_model_selector.recommend_model(
+                    request.prompt, 
+                    request.image_path, 
+                    request.image_data
+                )
+            except Exception as e:
+                self.logger.warning(f"ML model selection failed: {e}")
+                return None
+        return None
+    
+    def update_model_performance(self, model_name: str, request: AIRequest, 
+                               success: bool, response_time: float, cost: float):
+        """Update ML model performance metrics"""
+        if self.ml_model_selector:
+            try:
+                self.ml_model_selector.update_performance(
+                    model_name, 
+                    request.prompt, 
+                    success, 
+                    response_time, 
+                    cost,
+                    request.image_path, 
+                    request.image_data
+                )
+            except Exception as e:
+                self.logger.warning(f"ML performance update failed: {e}")
+    
+    def get_ml_model_stats(self) -> Optional[Dict[str, Any]]:
+        """Get ML model selection statistics"""
+        if self.ml_model_selector:
+            try:
+                return self.ml_model_selector.get_model_stats()
+            except Exception as e:
+                self.logger.warning(f"ML stats retrieval failed: {e}")
+                return None
+        return None
     
     def reset_daily_metrics(self):
         """Reset daily metrics (called at midnight)"""

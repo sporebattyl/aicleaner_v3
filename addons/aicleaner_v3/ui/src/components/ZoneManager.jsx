@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Form, Badge, Alert, Modal, Row, Col } from 'react-bootstrap';
-import { ApiService } from '../services/ApiService';
+import ApiService from '../services/ApiService';
 
 export const ZoneManager = () => {
     const [zones, setZones] = useState([]);
