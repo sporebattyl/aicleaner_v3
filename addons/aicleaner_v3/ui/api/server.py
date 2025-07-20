@@ -7,6 +7,8 @@ FastAPI-based REST API for web interface
 import asyncio
 import json
 import logging
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -20,6 +22,9 @@ import uvicorn
 from utils.tiered_config_manager import TieredConfigurationManager, ConfigurationTier
 from utils.simple_health_monitor import SimpleHealthMonitor
 from utils.security_presets import SecurityPresetManager, SecurityLevel
+from utils.configuration_manager import ConfigurationManager
+from integrations.security_validator import SecurityValidator
+from utils.manager_registry import ManagerRegistry, ManagerNames
 
 logger = logging.getLogger(__name__)
 
@@ -86,19 +91,60 @@ class AiCleanerAPIServer:
     
     def __init__(self, addon_root: str):
         self.addon_root = Path(addon_root)
-        self.app = FastAPI(title="AICleaner v3 API", version="3.0.0")
+        
+        # Define lifespan event handler for graceful shutdown
+        @asynccontextmanager
+        async def lifespan(app: FastAPI):
+            # Startup
+            logger.info("AICleaner v3 API Server starting up...")
+            yield
+            # Shutdown
+            logger.info("AICleaner v3 API Server shutting down...")
+            if hasattr(self, 'registry'):
+                self.registry.shutdown_all_managers()
+                logger.info("All managers shut down gracefully")
+        
+        self.app = FastAPI(
+            title="AICleaner v3 API", 
+            version="3.0.0",
+            lifespan=lifespan
+        )
         self.websocket_connections: List[WebSocket] = []
         
-        # Initialize tiered configuration manager
+        # Initialize manager registry and set addon root
+        self.registry = ManagerRegistry()
+        self.registry.set_addon_root(addon_root)
+        
+        # Initialize core managers through registry
         config_path = self.addon_root / "config"
-        self.tiered_config = TieredConfigurationManager(str(config_path))
+        self.tiered_config = self.registry.get_or_create_manager(
+            ManagerNames.TIERED_CONFIG.value,
+            TieredConfigurationManager,
+            str(config_path)
+        )
         
-        # Initialize simple health monitor
-        self.health_monitor = SimpleHealthMonitor()
+        self.health_monitor = self.registry.get_or_create_manager(
+            ManagerNames.HEALTH_MONITOR.value,
+            SimpleHealthMonitor
+        )
         
-        # Initialize security preset manager
         security_path = self.addon_root / "security"
-        self.security_manager = SecurityPresetManager(str(security_path))
+        self.security_manager = self.registry.get_or_create_manager(
+            ManagerNames.SECURITY_PRESETS.value,
+            SecurityPresetManager,
+            str(security_path)
+        )
+        
+        # Register ConfigurationManager and SecurityValidator
+        self.configuration_manager = self.registry.get_or_create_manager(
+            ManagerNames.CONFIGURATION.value,
+            ConfigurationManager
+        )
+        
+        self.security_validator = self.registry.get_or_create_manager(
+            ManagerNames.SECURITY_VALIDATOR.value,
+            SecurityValidator
+        )
         
         # Configure CORS
         self.app.add_middleware(
@@ -220,13 +266,9 @@ class AiCleanerAPIServer:
         async def get_configuration():
             """Get current configuration"""
             try:
-                config_file = self.addon_root / "config" / "aicleaner_config.json"
-                if config_file.exists():
-                    with open(config_file) as f:
-                        config = json.load(f)
-                    return ConfigurationModel(**config)
-                else:
-                    return ConfigurationModel()
+                # Use ConfigurationManager from registry
+                config = self.configuration_manager.load_configuration()
+                return ConfigurationModel(**config)
             except Exception as e:
                 logger.error(f"Failed to load configuration: {e}")
                 raise HTTPException(status_code=500, detail="Failed to load configuration")
@@ -469,11 +511,8 @@ class AiCleanerAPIServer:
         async def get_security_status():
             """Get security status"""
             try:
-                # Import security validator to check status
-                from ...integrations.security_validator import SecurityValidator
-                
-                security_validator = SecurityValidator()
-                await security_validator.initialize()
+                # Use SecurityValidator from registry
+                security_validator = self.security_validator
                 
                 # Perform security checks
                 current_time = datetime.now().isoformat()
@@ -496,7 +535,6 @@ class AiCleanerAPIServer:
                     ]
                 )
                 
-                await security_validator.cleanup()
                 return security_status
                 
             except Exception as e:
@@ -523,18 +561,14 @@ class AiCleanerAPIServer:
         async def validate_supervisor_token(token_data: Dict[str, str]):
             """Validate supervisor token"""
             try:
-                from ...integrations.security_validator import SecurityValidator
-                
                 token = token_data.get("token", "")
                 if not token:
                     raise HTTPException(status_code=400, detail="Token is required")
                 
-                security_validator = SecurityValidator()
-                await security_validator.initialize()
+                # Use SecurityValidator from registry
+                security_validator = self.security_validator
                 
                 is_valid = await security_validator.validate_supervisor_token(token)
-                
-                await security_validator.cleanup()
                 
                 return {
                     "valid": is_valid,
@@ -619,13 +653,23 @@ class AiCleanerAPIServer:
                 logger.error(f"Failed to get MQTT entities: {e}")
                 raise HTTPException(status_code=500, detail="Failed to get MQTT entities")
         
+        @self.app.get("/api/managers/status")
+        async def get_manager_status():
+            """Get status of all registered managers"""
+            try:
+                status = self.registry.get_manager_status()
+                return status
+            except Exception as e:
+                logger.error(f"Failed to get manager status: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get manager status")
+        
         @self.app.post("/api/config/validate")
         async def validate_configuration(config_data: Dict[str, Any]):
             """Validate configuration in real-time"""
             try:
-                from ...utils.configuration_manager import ConfigurationManager
+                # Use ConfigurationManager from registry (already initialized in __init__)
+                config_manager = self.configuration_manager
                 
-                config_manager = ConfigurationManager()
                 is_valid = config_manager.validate_configuration(config_data)
                 errors = config_manager.get_validation_errors()
                 warnings = self._generate_configuration_warnings(config_data)
@@ -647,11 +691,8 @@ class AiCleanerAPIServer:
         async def save_configuration(config_data: Dict[str, Any]):
             """Save configuration with validation and audit logging"""
             try:
-                from ...utils.configuration_manager import ConfigurationManager
-                from ...integrations.security_validator import SecurityValidator
-                
-                # Validate configuration first
-                config_manager = ConfigurationManager()
+                # Use managers from registry
+                config_manager = self.configuration_manager
                 is_valid = config_manager.validate_configuration(config_data)
                 
                 if not is_valid:
@@ -662,8 +703,7 @@ class AiCleanerAPIServer:
                     )
                 
                 # Security validation
-                security_validator = SecurityValidator()
-                await security_validator.initialize()
+                security_validator = self.security_validator
                 
                 # Audit logging (simplified)
                 logger.info(f"Configuration update request from {datetime.now().isoformat()}")
@@ -683,8 +723,6 @@ class AiCleanerAPIServer:
                         "sections_updated": list(config_data.keys())
                     }
                 })
-                
-                await security_validator.cleanup()
                 
                 return {
                     "status": "success", 
@@ -863,9 +901,14 @@ class AiCleanerAPIServer:
         
         return impact
     
+    def get_manager(self, name: str):
+        """Get a manager from the registry (for external access)"""
+        return self.registry.get_manager(name)
+    
     def start_server(self, host: str = "0.0.0.0", port: int = 8080):
         """Start the API server"""
         logger.info(f"Starting AICleaner v3 API server on {host}:{port}")
+        logger.info(f"Registered managers: {list(self.registry.get_all_managers().keys())}")
         uvicorn.run(self.app, host=host, port=port)
 
 if __name__ == "__main__":

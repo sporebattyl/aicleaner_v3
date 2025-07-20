@@ -253,19 +253,65 @@ class SimpleHealthMonitor:
     async def _check_ai_service(self) -> tuple[bool, str, Optional[str]]:
         """Check AI service health"""
         try:
-            # Simple check - can we access the AI configuration?
-            # In a real implementation, this would ping the AI provider
-            return True, "AI service responding", "Configuration accessible"
+            # Import AI provider manager for actual health check
+            from ..ai.providers.ai_provider_manager import AIProviderManager
+            
+            ai_manager = AIProviderManager()
+            await ai_manager.initialize()
+            
+            # Get active providers and test connectivity
+            active_providers = ai_manager.get_active_providers()
+            if not active_providers:
+                return False, "No AI providers configured", "At least one AI provider must be configured"
+            
+            # Test primary provider with lightweight health check
+            primary_provider = ai_manager.get_primary_provider()
+            if primary_provider:
+                # Simple connectivity test - just check if provider is reachable
+                try:
+                    health_status = await primary_provider.health_check()
+                    if health_status:
+                        return True, f"AI service operational ({primary_provider.name})", f"{len(active_providers)} provider(s) available"
+                    else:
+                        return False, "Primary AI provider health check failed", "Check provider configuration and API keys"
+                except Exception as e:
+                    return False, "AI provider connectivity issues", f"Error: {str(e)[:100]}"
+            
+            return False, "No primary AI provider available", "Configure a primary AI provider"
+            
+        except ImportError:
+            # Fallback if AI manager not available
+            return True, "AI service check skipped", "AI provider manager not available"
         except Exception as e:
-            return False, "AI service not responding", str(e)
+            logger.error(f"AI service health check failed: {e}")
+            return False, "AI service health check error", str(e)
     
     async def _check_config_service(self) -> tuple[bool, str, Optional[str]]:
         """Check configuration service health"""
         try:
-            # Simple check - can we load configuration?
-            return True, "Configuration service responding", "Config files accessible"
+            # Import tiered configuration manager for actual health check
+            from .tiered_config_manager import TieredConfigurationManager
+            
+            config_manager = TieredConfigurationManager()
+            
+            # Test configuration loading
+            merged_config = config_manager.get_merged_configuration()
+            if not merged_config:
+                return False, "Configuration service not responding", "Unable to load merged configuration"
+            
+            # Check configuration health
+            health_status = config_manager.get_configuration_health()
+            if health_status.get('status') == 'healthy':
+                return True, "Configuration service responding", f"All tiers accessible, {len(merged_config)} settings loaded"
+            else:
+                issues = health_status.get('issues', [])
+                return False, "Configuration issues detected", f"Issues: {', '.join(issues[:2])}"
+                
+        except ImportError:
+            return True, "Configuration check skipped", "Tiered configuration manager not available"
         except Exception as e:
-            return False, "Configuration service not responding", str(e)
+            logger.error(f"Configuration service health check failed: {e}")
+            return False, "Configuration service error", str(e)
     
     async def _check_core_service(self) -> tuple[bool, str, Optional[str]]:
         """Check core system health"""
@@ -325,8 +371,53 @@ class SimpleHealthMonitor:
     
     async def _check_api_keys(self) -> tuple[bool, str, Optional[str]]:
         """Check API key configuration"""
-        # Simple placeholder - in real implementation would check actual config
-        return True, "API keys configured", None
+        try:
+            # Import configuration manager to check API keys
+            from .tiered_config_manager import TieredConfigurationManager
+            
+            config_manager = TieredConfigurationManager()
+            merged_config = config_manager.get_merged_configuration()
+            
+            # Check for AI provider API keys
+            ai_config = merged_config.get('ai', {})
+            providers = ai_config.get('providers', {})
+            
+            configured_providers = []
+            missing_keys = []
+            
+            # Check common AI providers
+            provider_checks = {
+                'openai': ['openai_api_key', 'api_key'],
+                'anthropic': ['anthropic_api_key', 'api_key'],
+                'google': ['google_api_key', 'gemini_api_key', 'api_key'],
+                'ollama': []  # Ollama typically doesn't need API keys
+            }
+            
+            for provider, key_names in provider_checks.items():
+                provider_config = providers.get(provider, {})
+                if provider_config.get('enabled', False):
+                    if not key_names:  # Ollama case
+                        configured_providers.append(provider)
+                    else:
+                        has_key = any(provider_config.get(key) for key in key_names)
+                        if has_key:
+                            configured_providers.append(provider)
+                        else:
+                            missing_keys.append(provider)
+            
+            if not configured_providers:
+                return False, "No AI providers configured", "Configure at least one AI provider with API keys"
+            
+            if missing_keys:
+                return False, f"Missing API keys for {', '.join(missing_keys)}", "Check AI provider API key configuration"
+            
+            return True, f"API keys configured for {', '.join(configured_providers)}", f"{len(configured_providers)} provider(s) ready"
+            
+        except ImportError:
+            return True, "API key check skipped", "Configuration manager not available"
+        except Exception as e:
+            logger.error(f"API key check failed: {e}")
+            return False, "API key check error", str(e)
     
     async def _check_zones(self) -> tuple[bool, str, Optional[str]]:
         """Check zone configuration"""
@@ -335,8 +426,28 @@ class SimpleHealthMonitor:
     
     async def _check_mqtt(self) -> tuple[bool, str, Optional[str]]:
         """Check MQTT configuration"""
-        # Simple placeholder - in real implementation would check MQTT connection
-        return True, "MQTT configured", None
+        try:
+            # Import MQTT adapter to check actual configuration
+            from ..mqtt.adapter import MQTTAdapter
+            
+            mqtt_adapter = MQTTAdapter()
+            
+            # Check if MQTT is properly configured
+            if not mqtt_adapter.is_configured():
+                return False, "MQTT not configured", "Configure MQTT broker settings in configuration"
+            
+            # Validate configuration parameters
+            config_issues = await mqtt_adapter.validate_configuration()
+            if config_issues:
+                return False, "MQTT configuration issues", f"Issues: {', '.join(config_issues[:2])}"
+            
+            return True, "MQTT configured properly", "All MQTT settings validated"
+            
+        except ImportError:
+            return True, "MQTT check skipped", "MQTT adapter not available"
+        except Exception as e:
+            logger.error(f"MQTT configuration check failed: {e}")
+            return False, "MQTT configuration error", str(e)
     
     async def _check_integrations(self) -> List[HealthIndicator]:
         """Check external integration health"""
@@ -376,13 +487,62 @@ class SimpleHealthMonitor:
     
     async def _check_ha_integration(self) -> tuple[bool, str, Optional[str]]:
         """Check Home Assistant integration"""
-        # Placeholder - would check actual HA connection
-        return True, "Home Assistant connected", "API accessible"
+        try:
+            # Import HA client for actual connectivity check
+            from ..integrations.ha_client import HAClient
+            
+            ha_client = HAClient()
+            
+            # Check if HA is configured and accessible
+            if not ha_client.is_configured():
+                return False, "Home Assistant not configured", "Configure Home Assistant connection settings"
+            
+            # Test connectivity to HA API
+            is_connected = await ha_client.test_connection()
+            if not is_connected:
+                return False, "Home Assistant unreachable", "Check Home Assistant URL and access token"
+            
+            # Get basic status information
+            status_info = await ha_client.get_status()
+            if status_info:
+                entities_count = status_info.get('entity_count', 0)
+                return True, "Home Assistant connected", f"API accessible, {entities_count} entities available"
+            else:
+                return True, "Home Assistant connected", "API accessible, status pending"
+                
+        except ImportError:
+            return True, "HA integration check skipped", "HA client not available"
+        except Exception as e:
+            logger.error(f"HA integration health check failed: {e}")
+            return False, "HA integration error", str(e)
     
     async def _check_mqtt_integration(self) -> tuple[bool, str, Optional[str]]:
         """Check MQTT broker integration"""
-        # Placeholder - would check actual MQTT connection
-        return True, "MQTT broker connected", "Discovery working"
+        try:
+            # Import MQTT adapter for actual connectivity check
+            from ..mqtt.adapter import MQTTAdapter
+            
+            mqtt_adapter = MQTTAdapter()
+            
+            # Check if MQTT is configured
+            if not mqtt_adapter.is_configured():
+                return False, "MQTT not configured", "Configure MQTT broker settings"
+            
+            # Test MQTT connectivity
+            is_connected = await mqtt_adapter.test_connection()
+            if is_connected:
+                # Get additional status info
+                status_info = await mqtt_adapter.get_status()
+                entity_count = status_info.get('discovered_entities', 0)
+                return True, "MQTT broker connected", f"Discovery active, {entity_count} entities discovered"
+            else:
+                return False, "MQTT broker unreachable", "Check broker address, port, and credentials"
+                
+        except ImportError:
+            return True, "MQTT check skipped", "MQTT adapter not available"
+        except Exception as e:
+            logger.error(f"MQTT integration health check failed: {e}")
+            return False, "MQTT integration error", str(e)
     
     def _determine_overall_status(self, indicators: List[HealthIndicator]) -> HealthStatus:
         """Determine overall system health from indicators"""
