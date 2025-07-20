@@ -25,6 +25,7 @@ from utils.security_presets import SecurityPresetManager, SecurityLevel
 from utils.configuration_manager import ConfigurationManager
 from integrations.security_validator import SecurityValidator
 from utils.manager_registry import ManagerRegistry, ManagerNames
+from api.v1.main import api_router, add_rate_limiter_to_app, add_enhanced_middleware_to_app
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,13 @@ class AiCleanerAPIServer:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        
+        # Add enhanced middleware (includes rate limiter and exception handlers)
+        add_rate_limiter_to_app(self.app)
+        add_enhanced_middleware_to_app(self.app)
+        
+        # Include Developer API router
+        self.app.include_router(api_router, tags=["Developer API v1"])
         
         # Mount static files
         static_path = self.addon_root / "ui" / "dist"

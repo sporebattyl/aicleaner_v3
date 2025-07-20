@@ -135,66 +135,279 @@ Examples:
 - `phase4a_entity_manager_002`
 - `security_audit_authentication_001`
 
-## 3. Command Templates and Cookbooks
+## 3. Command Templates and Cookbooks (2025 Update)
 
-### 3.1 Architectural Review Template
+### 3.1 Model-Optimized Template System
 
+**Use task-appropriate models for maximum efficiency and availability:**
+
+#### 🎯 **Complex Analysis Templates** (Use gemini-2.5-pro)
+
+**Architectural Review Template:**
 ```bash
-gemini --context "arch_review_$(date +%Y%m%d)" \
+gemini --model gemini-2.5-pro \
+       --context "arch_review_$(date +%Y%m%d)" \
        --context-include 'CLAUDE.md' \
        --context-include 'addons/aicleaner_v3/{target_module}/**' \
        --thinking-budget high \
-       "Perform architectural review of {target_module}:
-       1. Generate PlantUML component diagram
-       2. Identify architectural issues and technical debt
-       3. Propose specific improvements with rationale
+       "Perform comprehensive architectural review of {target_module}:
+       1. Generate PlantUML component diagram showing relationships
+       2. Identify architectural issues, technical debt, and anti-patterns
+       3. Propose specific improvements with detailed rationale
        4. Provide implementation roadmap with risk assessment
-       5. Output as structured artifact with unified diffs"
+       5. Output as structured artifact with unified diffs
+       6. Include performance and scalability considerations"
 ```
 
-### 3.2 Security Audit Template
-
+**Security Audit Template:**
 ```bash
-gemini --context "security_audit_$(date +%Y%m%d)" \
+gemini --model gemini-2.5-pro \
+       --context "security_audit_$(date +%Y%m%d)" \
        --context-include 'addons/aicleaner_v3/security/**' \
        --context-include '{target_files}' \
        --thinking-budget high \
-       "Perform security audit based on OWASP Top 10:
-       1. Identify potential vulnerabilities
-       2. Assess risk levels and impact
-       3. Propose specific mitigations
-       4. Provide security test cases
-       5. Generate compliance report"
+       "Perform comprehensive security audit based on OWASP Top 10:
+       1. Identify potential vulnerabilities with CVE mappings
+       2. Assess risk levels using CVSS scoring
+       3. Propose specific mitigations with implementation details
+       4. Provide security test cases and validation procedures
+       5. Generate compliance report with remediation timeline
+       6. Include threat modeling and attack surface analysis"
 ```
 
-### 3.3 Performance Review Template
+#### ⚡ **Balanced Development Templates** (Use gemini-2.5-flash)
 
+**Implementation Design Template:**
 ```bash
-gemini --context "perf_review_$(date +%Y%m%d)" \
+gemini --model gemini-2.5-flash \
+       --context "impl_design_$(date +%Y%m%d)" \
        --context-include 'addons/aicleaner_v3/{target_module}/**' \
-       --context-include 'benchmarks/**' \
+       --context-include 'tests/**/{related_tests}' \
        --thinking-budget medium \
-       "Analyze performance characteristics:
-       1. Identify performance bottlenecks
-       2. Analyze resource usage patterns
-       3. Propose optimization strategies
-       4. Provide benchmark test cases
-       5. Estimate performance improvements"
+       "Design implementation for {feature_name}:
+       1. Analyze existing code patterns and conventions
+       2. Design component interfaces and data structures
+       3. Propose implementation strategy with error handling
+       4. Create test cases and validation procedures
+       5. Provide step-by-step implementation guide
+       6. Include integration points and dependencies"
 ```
 
-### 3.4 Refactoring Template
-
+**Code Review Template:**
 ```bash
-gemini --context "refactor_$(date +%Y%m%d)" \
+gemini --model gemini-2.5-flash \
+       --context "code_review_$(date +%Y%m%d)" \
        --context-include '{target_files}' \
        --context-include 'tests/**/{related_tests}' \
        --thinking-budget medium \
-       "Refactor code for improved maintainability:
-       1. Identify code smells and anti-patterns
-       2. Propose specific refactoring strategies
-       3. Maintain backward compatibility
-       4. Update tests and documentation
-       5. Provide step-by-step migration guide"
+       "Review code changes for quality and best practices:
+       1. Check adherence to coding standards and patterns
+       2. Identify potential bugs, edge cases, and error scenarios
+       3. Verify test coverage and quality
+       4. Suggest performance optimizations
+       5. Provide refactoring recommendations
+       6. Validate security implications"
+```
+
+#### 🚀 **Quick Iteration Templates** (Use gemini-2.5-flash-lite)
+
+**Bug Fix Analysis Template:**
+```bash
+gemini --model gemini-2.5-flash-lite \
+       --context "bugfix_$(date +%Y%m%d)" \
+       --context-include '{problematic_files}' \
+       "Analyze and fix the reported bug:
+       1. Reproduce the issue and identify root cause
+       2. Propose minimal fix with clear rationale
+       3. Ensure fix doesn't introduce regressions
+       4. Provide test case to prevent recurrence
+       5. Document the solution"
+```
+
+**Quick Validation Template:**
+```bash
+gemini --model gemini-2.0-flash-lite \
+       --context "validation_$(date +%Y%m%d)" \
+       "Quick validation of proposed approach:
+       1. Assess technical feasibility
+       2. Identify potential issues or concerns
+       3. Suggest immediate improvements
+       4. Confirm alignment with project goals"
+```
+
+#### 🔄 **High-Volume Templates** (Use gemini-2.5-flash-lite for sustained work)
+
+**Batch Analysis Template:**
+```bash
+gemini --model gemini-2.5-flash-lite \
+       --context "batch_analysis_$(date +%Y%m%d)" \
+       --context-include '{file_pattern}' \
+       "Analyze multiple files for consistent patterns:
+       1. Identify common patterns and inconsistencies
+       2. Suggest standardization opportunities
+       3. Highlight potential issues across files
+       4. Provide bulk refactoring recommendations"
+```
+
+**Documentation Generation Template:**
+```bash
+gemini --model gemini-2.5-flash-lite \
+       --context "docs_gen_$(date +%Y%m%d)" \
+       --context-include '{target_files}' \
+       "Generate comprehensive documentation:
+       1. Extract API interfaces and usage patterns
+       2. Create clear examples and use cases
+       3. Document configuration options
+       4. Include troubleshooting guide"
+```
+
+### 3.2 Intelligent API Cycling Integration
+
+**🚀 AUTOMATED INTELLIGENCE: Rate limits now handled completely automatically**
+
+**No Manual Templates Needed:**
+The intelligent API cycling system handles all rate limit management transparently. Claude simply uses Gemini without thinking about API keys or rate limits.
+
+**Integration with Gemini-CLI:**
+```bash
+# Claude now automatically gets optimal API key + model
+# The system handles all 20 combinations (4 keys × 5 models) transparently
+
+gemini --context "{session_name}" \
+       --context-include '{context_files}' \
+       --intelligent-cycling true \
+       "{task_description}"
+```
+
+**Python Integration Example:**
+```python
+from utils.gemini_model_selector import get_collaboration_strategy
+
+# Get complete strategy with intelligent API cycling
+strategy = get_collaboration_strategy(
+    prompt="Implement authentication system",
+    context_files=["auth/*.py", "config/*.yaml"],
+    urgency="standard"
+)
+
+# Strategy includes optimal API key and model automatically
+api_key = strategy["api_key"]        # Best available key
+model = strategy["selected_model"]   # Optimal model for task
+fallbacks = strategy["fallback_sequence"]  # Automatic fallback plan
+```
+
+**Transparent Operation:**
+- ✅ **No rate limit management needed**: System handles everything
+- ✅ **Optimal model selection**: Always gets best model for the task  
+- ✅ **Intelligent fallback**: Tries all combinations automatically
+- ✅ **Learning system**: Improves over time based on usage patterns
+- ✅ **Health monitoring**: Real-time API key health tracking
+
+### 3.3 Intelligent API Integration Functions
+
+**Python API Functions (Recommended):**
+```python
+from utils.gemini_model_selector import (
+    get_optimal_api_key_model,
+    get_collaboration_strategy,
+    record_gemini_success,
+    record_gemini_failure,
+    get_gemini_health_status
+)
+
+# Get optimal API key + model combination
+api_key, model = get_optimal_api_key_model(
+    prompt="Implement user authentication system",
+    context_files=["auth/*.py", "config/*.yaml"],
+    urgency="standard"  # immediate, standard, sustained, batch
+)
+
+# Get complete collaboration strategy
+strategy = get_collaboration_strategy(
+    prompt="Analyze security vulnerabilities in payment system",
+    context_files=["payments/*.py", "security/*.yaml"],
+    urgency="immediate",
+    conversation_stage="initial",
+    expected_duration="30min"
+)
+
+# After successful API call (for learning)
+record_gemini_success(api_key, model)
+
+# After failed API call (for learning) 
+record_gemini_failure(api_key, model, error_type="rate_limit")
+
+# Check API health status
+health = get_gemini_health_status()
+print(f"Available: {health['healthy_keys']}/{health['total_keys']} keys")
+```
+
+**Bash Integration (Optional):**
+```bash
+# For environments where Python integration isn't available
+# The system automatically selects optimal combinations
+
+gemini --context "session_$(date +%Y%m%d)" \
+       --context-include 'relevant/files/**' \
+       "Task description here"
+
+# No need to specify model or API key - handled automatically
+```
+
+**Migration from Manual System:**
+- ❌ **Old**: Manual key cycling with bash functions
+- ✅ **New**: Automatic intelligent selection with learning
+- ❌ **Old**: Static model selection based on rules  
+- ✅ **New**: Dynamic selection based on real-time availability
+- ❌ **Old**: No memory between sessions
+- ✅ **New**: Persistent learning across all Claude sessions
+```
+
+### 3.4 Context Optimization for Different Models
+
+**Model-Specific Context Management:**
+
+```bash
+# For gemini-2.5-pro (complex analysis)
+gemini --model gemini-2.5-pro \
+       --context-include 'CLAUDE.md' \
+       --context-include 'AI_COLLABORATION_FRAMEWORK.md' \
+       --context-include 'addons/aicleaner_v3/**/*.py' \
+       --context-exclude '**/__pycache__/**' \
+       --context-exclude '**/test_*.py' \
+       --thinking-budget high
+
+# For gemini-2.5-flash (balanced work)  
+gemini --model gemini-2.5-flash \
+       --context-include 'addons/aicleaner_v3/{specific_module}/**' \
+       --context-include 'tests/{specific_module}/**' \
+       --thinking-budget medium
+
+# For lite models (quick/sustained work)
+gemini --model gemini-2.5-flash-lite \
+       --context-include '{specific_files}' \
+       --thinking-budget low
+```
+
+### 3.5 Collaboration Session Management
+
+**Session Types with Optimal Models:**
+
+```bash
+# Deep Analysis Session (use 2.5-pro)
+gemini --model gemini-2.5-pro \
+       --session-type "analysis" \
+       --expected-duration "30min"
+
+# Development Session (use 2.5-flash-lite for sustainability)  
+gemini --model gemini-2.5-flash-lite \
+       --session-type "development" \
+       --expected-duration "2hours"
+
+# Quick Iteration Session (use 2.0-flash-lite for speed)
+gemini --model gemini-2.0-flash-lite \
+       --session-type "iteration" \
+       --expected-duration "15min"
 ```
 
 ## 4. Quality Assurance Framework

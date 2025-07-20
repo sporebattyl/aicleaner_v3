@@ -87,6 +87,25 @@ options:
       parallel_processing: true
       model_caching: true
       async_processing: true
+  api:
+    enabled: true
+    version: "v1"
+    rate_limiting:
+      enabled: true
+      default_limit: "60/minute"
+      privileged_limit: "30/minute"
+      admin_limit: "10/minute"
+    security:
+      require_api_key: true
+      audit_logging: true
+      cors_origins: ["*"]
+    keys:
+      # API keys will be generated and stored here
+      # Format: {hashed_key}: {name: str, permissions: dict, created_at: str, rate_limit: str}
+    documentation:
+      swagger_ui: true
+      redoc: true
+      openapi_url: "/api/v1/openapi.json"
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)
   ai_providers:
@@ -155,6 +174,23 @@ schema:
       parallel_processing: bool?
       model_caching: bool?
       async_processing: bool?
+  api:
+    enabled: bool
+    version: str?
+    rate_limiting:
+      enabled: bool?
+      default_limit: str?
+      privileged_limit: str?
+      admin_limit: str?
+    security:
+      require_api_key: bool?
+      audit_logging: bool?
+      cors_origins: "[str]"?
+    keys: "[object]"?
+    documentation:
+      swagger_ui: bool?
+      redoc: bool?
+      openapi_url: str?
 image: "ghcr.io/drewcifer/aicleaner_v3-{arch}"
 services:
   - mqtt:want

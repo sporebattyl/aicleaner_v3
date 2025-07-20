@@ -1,7 +1,3 @@
 """
-API package for AICleaner v3 Web Interface
+AICleaner v3 Developer API Package
 """
-
-from .backend import app
-
-__all__ = ["app"]
