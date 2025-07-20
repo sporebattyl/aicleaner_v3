@@ -189,10 +189,86 @@ response = model.generate_content('Analyze this code structure...')
 print(response.text)
 ```
 
-**Model Selection for AICleaner:**
-- Use `gemini-2.5-pro` for complex architectural tasks and code reviews
-- Use `gemini-2.5-flash` for general coding and quick analysis
-- Use `gemini-2.5-flash-lite` for simple queries and documentation
+## Intelligent Gemini Model Selection Framework
+
+**MANDATORY: Use this decision framework for optimal model selection and API efficiency**
+
+### Automatic Model Selection Criteria
+
+**Before each Gemini collaboration, evaluate the task using these criteria:**
+
+1. **Prompt Complexity Analysis:**
+   - **Short prompts** (<200 chars) + simple language → gemini-2.0-flash
+   - **Medium prompts** (200-1000 chars) + technical terms → gemini-2.5-flash
+   - **Long prompts** (>1000 chars) + complex analysis → gemini-2.5-pro
+
+2. **Context Requirements:**
+   - **References to multiple files/large codebase** → gemini-2.5-pro
+   - **Single file or component focus** → gemini-2.5-flash  
+   - **No code context needed** → gemini-2.0-flash
+
+3. **Task Type Keywords:**
+   - **"analyze", "review", "architecture", "comprehensive"** → gemini-2.5-pro
+   - **"implement", "code", "refactor", "discuss"** → gemini-2.5-flash
+   - **"confirm", "quick", "simple", "yes/no"** → gemini-2.0-flash
+
+4. **Conversation Stage:**
+   - **First message** in conversation → gemini-2.5-pro (for context setting)
+   - **Follow-up clarifications** → gemini-2.0-flash
+   - **Mid-conversation development** → gemini-2.5-flash
+
+### Decision Tree Examples
+
+**✅ Use gemini-2.5-pro for:**
+- Initial codebase architecture analysis (large context needed)
+- Complex planning sessions with multiple considerations  
+- Deep technical reviews requiring comprehensive understanding
+- Strategic decision making with multiple trade-offs
+
+**✅ Use gemini-2.5-flash for:**
+- Implementation discussions and code generation
+- Iterative plan refinement
+- Medium complexity technical questions
+- Code reviews of moderate size
+
+**✅ Use gemini-2.0-flash for:**
+- Simple confirmations ("Does this approach sound good?")
+- Basic status updates and progress checks
+- Quick clarifications on specific points
+- Simple yes/no or multiple choice questions
+
+### Rate Limit Fallback Chain
+**When rate limited, follow this automatic fallback:**
+1. **gemini-2.5-pro** (rate limited) → **gemini-2.5-flash** → **gemini-2.0-flash** → proceed without Gemini
+2. Always cycle through all 4 API keys for each model before falling back
+
+### Future Automation Code Framework
+```python
+def select_gemini_model(prompt, context_files=[], conversation_stage="initial"):
+    score = 0
+    
+    # Prompt complexity
+    if len(prompt) > 1000: score += 2
+    elif len(prompt) > 200: score += 1
+    
+    # Keyword analysis  
+    complex_keywords = ["analyze", "architecture", "comprehensive", "review"]
+    simple_keywords = ["confirm", "quick", "yes", "no", "simple"]
+    if any(kw in prompt.lower() for kw in complex_keywords): score += 2
+    if any(kw in prompt.lower() for kw in simple_keywords): score -= 1
+    
+    # Context requirements
+    if len(context_files) > 3: score += 2
+    elif len(context_files) > 0: score += 1
+    
+    # Conversation stage
+    if conversation_stage == "initial": score += 1
+    elif conversation_stage == "followup": score -= 1
+    
+    if score >= 4: return "gemini-2.5-pro"
+    elif score <= 0: return "gemini-2.0-flash"  
+    else: return "gemini-2.5-flash"
+```
 
 ## API Keys and Rate Limit Management
 
