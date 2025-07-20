@@ -17,6 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+from utils.tiered_config_manager import TieredConfigurationManager, ConfigurationTier
+from utils.simple_health_monitor import SimpleHealthMonitor
+from utils.security_presets import SecurityPresetManager, SecurityLevel
+
 logger = logging.getLogger(__name__)
 
 # Data Models
@@ -25,6 +29,11 @@ class ConfigurationModel(BaseModel):
     mqtt: Optional[Dict[str, Any]] = {}
     zones: Optional[Dict[str, Any]] = {}
     devices: Optional[Dict[str, Any]] = {}
+
+class TieredConfigModel(BaseModel):
+    """Model for tiered configuration requests"""
+    config: Dict[str, Any]
+    tier: str
 
 class DeviceModel(BaseModel):
     id: str
@@ -80,6 +89,17 @@ class AiCleanerAPIServer:
         self.app = FastAPI(title="AICleaner v3 API", version="3.0.0")
         self.websocket_connections: List[WebSocket] = []
         
+        # Initialize tiered configuration manager
+        config_path = self.addon_root / "config"
+        self.tiered_config = TieredConfigurationManager(str(config_path))
+        
+        # Initialize simple health monitor
+        self.health_monitor = SimpleHealthMonitor()
+        
+        # Initialize security preset manager
+        security_path = self.addon_root / "security"
+        self.security_manager = SecurityPresetManager(str(security_path))
+        
         # Configure CORS
         self.app.add_middleware(
             CORSMiddleware,
@@ -102,6 +122,99 @@ class AiCleanerAPIServer:
         @self.app.get("/api/health")
         async def health_check():
             return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+        
+        # Enhanced Health Monitoring Endpoints
+        @self.app.get("/api/health/system")
+        async def get_system_health():
+            """Get comprehensive system health status"""
+            try:
+                health_data = await self.health_monitor.get_system_health()
+                return health_data
+            except Exception as e:
+                logger.error(f"Failed to get system health: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get system health")
+        
+        @self.app.get("/api/health/summary")
+        async def get_health_summary():
+            """Get simplified health summary"""
+            try:
+                summary = self.health_monitor.get_health_summary()
+                return summary
+            except Exception as e:
+                logger.error(f"Failed to get health summary: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get health summary")
+        
+        @self.app.post("/api/health/check")
+        async def run_health_check():
+            """Run an immediate health check"""
+            try:
+                health_data = await self.health_monitor.run_health_check()
+                return health_data
+            except Exception as e:
+                logger.error(f"Failed to run health check: {e}")
+                raise HTTPException(status_code=500, detail="Failed to run health check")
+        
+        # Security Preset Endpoints
+        @self.app.get("/api/security/status")
+        async def get_security_status():
+            """Get current security status"""
+            try:
+                status = self.security_manager.get_security_status()
+                return status
+            except Exception as e:
+                logger.error(f"Failed to get security status: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get security status")
+        
+        @self.app.get("/api/security/presets")
+        async def get_security_presets():
+            """Get available security presets"""
+            try:
+                presets = self.security_manager.get_available_presets()
+                return presets
+            except Exception as e:
+                logger.error(f"Failed to get security presets: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get security presets")
+        
+        @self.app.post("/api/security/preset/{level}")
+        async def apply_security_preset(level: str):
+            """Apply a security preset"""
+            try:
+                # Validate security level
+                try:
+                    security_level = SecurityLevel(level)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid security level: {level}")
+                
+                success = self.security_manager.apply_preset(security_level)
+                if not success:
+                    raise HTTPException(status_code=400, detail="Failed to apply security preset")
+                
+                return {"status": "success", "message": f"Applied {level} security preset"}
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Failed to apply security preset {level}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to apply {level} preset")
+        
+        @self.app.get("/api/security/compare")
+        async def compare_security_presets():
+            """Compare all security presets"""
+            try:
+                comparison = self.security_manager.compare_presets()
+                return comparison
+            except Exception as e:
+                logger.error(f"Failed to compare security presets: {e}")
+                raise HTTPException(status_code=500, detail="Failed to compare presets")
+        
+        @self.app.get("/api/security/recommendations/{use_case}")
+        async def get_security_recommendations(use_case: str):
+            """Get security preset recommendations for specific use case"""
+            try:
+                recommendations = self.security_manager.get_preset_recommendations(use_case)
+                return recommendations
+            except Exception as e:
+                logger.error(f"Failed to get security recommendations: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get recommendations")
         
         @self.app.get("/api/config", response_model=ConfigurationModel)
         async def get_configuration():
@@ -138,6 +251,82 @@ class AiCleanerAPIServer:
             except Exception as e:
                 logger.error(f"Failed to update configuration: {e}")
                 raise HTTPException(status_code=500, detail="Failed to update configuration")
+        
+        # Tiered Configuration Endpoints
+        @self.app.get("/api/config/tiered/{tier}")
+        async def get_tiered_configuration(tier: str):
+            """Get configuration for specific tier"""
+            try:
+                # Validate tier
+                try:
+                    config_tier = ConfigurationTier(tier)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}")
+                
+                config = self.tiered_config.get_config_for_tier(config_tier)
+                return config
+            except Exception as e:
+                logger.error(f"Failed to load tiered configuration for {tier}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to load {tier} configuration")
+        
+        @self.app.put("/api/config/tiered/{tier}")
+        async def update_tiered_configuration(tier: str, config_data: Dict[str, Any]):
+            """Update configuration for specific tier"""
+            try:
+                # Validate tier
+                try:
+                    config_tier = ConfigurationTier(tier)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}")
+                
+                success = self.tiered_config.update_config_for_tier(config_tier, config_data)
+                if not success:
+                    raise HTTPException(status_code=400, detail="Configuration validation failed")
+                
+                # Broadcast configuration update
+                await self._broadcast_websocket({
+                    "type": "tiered_config_updated",
+                    "payload": {"tier": tier, "config": config_data}
+                })
+                
+                return {"status": "success", "message": f"{tier} configuration updated"}
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Failed to update tiered configuration for {tier}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to update {tier} configuration")
+        
+        @self.app.get("/api/config/merged")
+        async def get_merged_configuration():
+            """Get merged configuration from all tiers"""
+            try:
+                config = self.tiered_config.get_merged_configuration()
+                return config
+            except Exception as e:
+                logger.error(f"Failed to get merged configuration: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get merged configuration")
+        
+        @self.app.get("/api/config/tiers")
+        async def get_tier_capabilities():
+            """Get capabilities for all configuration tiers"""
+            try:
+                capabilities = {}
+                for tier in ConfigurationTier:
+                    capabilities[tier.value] = self.tiered_config.get_tier_capabilities(tier)
+                return capabilities
+            except Exception as e:
+                logger.error(f"Failed to get tier capabilities: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get tier capabilities")
+        
+        @self.app.get("/api/config/health")
+        async def get_configuration_health():
+            """Get configuration system health"""
+            try:
+                health = self.tiered_config.get_configuration_health()
+                return health
+            except Exception as e:
+                logger.error(f"Failed to get configuration health: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get configuration health")
         
         @self.app.get("/api/devices", response_model=List[DeviceModel])
         async def get_devices():

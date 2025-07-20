@@ -7,11 +7,11 @@ import ApiService from './services/ApiService';
 import { getIngressBasePath, isIngressMode } from './utils/ingress';
 
 // Lazy load components for better performance
-const ConfigurationManager = lazy(() => import('./components/ConfigurationManager').then(module => ({ default: module.ConfigurationManager })));
-const MonitoringDashboard = lazy(() => import('./components/MonitoringDashboard').then(module => ({ default: module.MonitoringDashboard })));
+const TieredConfigurationPanel = lazy(() => import('./components/TieredConfigurationPanel'));
+const SimpleHealthDashboard = lazy(() => import('./components/SimpleHealthDashboard'));
 const DeviceController = lazy(() => import('./components/DeviceController').then(module => ({ default: module.DeviceController })));
 const ZoneManager = lazy(() => import('./components/ZoneManager').then(module => ({ default: module.ZoneManager })));
-const SecurityDashboard = lazy(() => import('./components/SecurityDashboard').then(module => ({ default: module.SecurityDashboard })));
+const SimpleSecurityManager = lazy(() => import('./components/SimpleSecurityManager'));
 const UnifiedConfigurationPanel = lazy(() => import('./components/UnifiedConfigurationPanel').then(module => ({ default: module.UnifiedConfigurationPanel })));
 
 function AppContent() {
@@ -106,7 +106,7 @@ function AppContent() {
         >
           <Tab eventKey="dashboard" title="Dashboard">
             <Suspense fallback={<LoadingSpinner />}>
-              <MonitoringDashboard securityStatus={securityStatus} mqttStatus={mqttStatus} />
+              <SimpleHealthDashboard />
             </Suspense>
           </Tab>
           
@@ -133,7 +133,7 @@ function AppContent() {
             }
           >
             <Suspense fallback={<LoadingSpinner />}>
-              <SecurityDashboard />
+              <SimpleSecurityManager />
             </Suspense>
           </Tab>
           
@@ -154,7 +154,7 @@ function AppContent() {
           
           <Tab eventKey="legacy-config" title="Legacy Config">
             <Suspense fallback={<LoadingSpinner />}>
-              <ConfigurationManager />
+              <TieredConfigurationPanel />
             </Suspense>
           </Tab>
         </Tabs>

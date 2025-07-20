@@ -52,6 +52,30 @@ class ApiService {
         });
     }
 
+    // Tiered Configuration API
+    async getTieredConfig(tier) {
+        return this.request(`/config/tiered/${tier}`);
+    }
+
+    async updateTieredConfig(tier, config) {
+        return this.request(`/config/tiered/${tier}`, {
+            method: 'PUT',
+            body: JSON.stringify(config)
+        });
+    }
+
+    async getMergedConfiguration() {
+        return this.request('/config/merged');
+    }
+
+    async getTierCapabilities() {
+        return this.request('/config/tiers');
+    }
+
+    async getConfigurationHealth() {
+        return this.request('/config/health');
+    }
+
     // Device API
     async getDevices() {
         return this.request('/devices');
