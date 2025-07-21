@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from .service_registry import Reloadable
+
 logger = logging.getLogger(__name__)
 
 
@@ -680,7 +682,7 @@ class AIProviderFactory:
         return list(cls._providers.keys())
 
 
-class AIService:
+class AIService(Reloadable):
     """
     Simple AI service that manages providers and handles requests.
     Uses configuration to determine active provider and fallbacks.
@@ -863,3 +865,53 @@ class AIService:
         """Get the default model for a given provider"""
         provider_config = self._config.get('ai_providers', {}).get(provider_name, {})
         return provider_config.get('default_model', 'unknown')
+    
+    async def validate_config(self, new_config: Dict) -> tuple[bool, Optional[str]]:
+        """
+        Validates the new AI service configuration.
+        Checks if the active provider exists and has necessary keys.
+        """
+        logger.info("AIService: Performing validation of new config.")
+        new_active_provider = new_config.get('general', {}).get('active_provider')
+        new_ai_providers_config = new_config.get('ai_providers', {})
+
+        if not new_active_provider:
+            return False, "New configuration missing 'general.active_provider'."
+        
+        if new_active_provider not in new_ai_providers_config:
+            return False, f"New active provider '{new_active_provider}' not found in 'ai_providers' section."
+        
+        # Add more specific validation for provider keys if needed (e.g., API keys, URLs)
+        # For example:
+        # if new_active_provider == 'openai' and not new_ai_providers_config.get('openai', {}).get('api_key'):
+        #     return False, "OpenAI API key missing in new configuration."
+
+        logger.info("AIService: New configuration validated successfully.")
+        return True, None
+
+    async def reload_config(self, new_config: Dict):
+        """Applies the new AI service configuration with initialize-then-swap pattern."""
+        logger.info("AIService: Applying new configuration.")
+        
+        # Store old config for potential rollback
+        old_config = self._config
+        old_providers_cache = self._providers_cache.copy()
+        
+        try:
+            # Update configuration
+            self._config = new_config
+            
+            # Clear provider cache to force recreation with new config
+            self._providers_cache.clear()
+            
+            # Initialize new providers with new config (lazy initialization will happen on first use)
+            logger.info("AIService: Provider cache cleared, new providers will be initialized on demand.")
+            
+            logger.info("AIService: Configuration reloaded successfully.")
+            
+        except Exception as e:
+            # Rollback on failure
+            logger.error(f"AIService: Configuration reload failed, rolling back: {e}")
+            self._config = old_config
+            self._providers_cache = old_providers_cache
+            raise

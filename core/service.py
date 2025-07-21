@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from .config_loader import config_loader
 from .ai_provider import AIService
 from .metrics_manager import MetricsManager
+from .service_registry import ServiceRegistry, ReloadContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Global instances
 ai_service: Optional[AIService] = None
 metrics_manager: Optional[MetricsManager] = None
+service_registry: Optional[ServiceRegistry] = None
 service_metrics = {
     'start_time': time.time(),
     'total_requests': 0,
@@ -41,7 +43,7 @@ service_metrics = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global ai_service, metrics_manager
+    global ai_service, metrics_manager, service_registry
     
     # Startup
     logger.info("Starting AICleaner v3 Core Service")
@@ -55,12 +57,23 @@ async def lifespan(app: FastAPI):
             logger.error(f"Configuration validation failed: {errors}")
             raise ValueError(f"Invalid configuration: {'; '.join(errors)}")
         
+        # Initialize Service Registry
+        service_registry = ServiceRegistry()
+        
+        # Set service registry in config loader
+        config_loader.set_service_registry(service_registry)
+        
         # Initialize AI service
         ai_service = AIService(config_loader)
         
         # Initialize Metrics Manager
         metrics_manager = MetricsManager(config)
         await metrics_manager.start_background_task()
+        
+        # Register services with the registry
+        service_registry.register_service("config_loader", config_loader)
+        service_registry.register_service("ai_service", ai_service, dependencies=["config_loader"])
+        # Note: metrics_manager doesn't implement Reloadable yet, could be added later
         
         logger.info("Core service initialized successfully")
         
@@ -418,8 +431,11 @@ async def get_configuration():
 
 @app.put("/v1/config")
 async def update_configuration(request: ConfigRequest):
-    """Updates the service configuration. Secrets are write-only."""
-    global ai_service
+    """Updates the service configuration using hot-reload system."""
+    global ai_service, service_registry
+    
+    if not service_registry:
+        raise HTTPException(status_code=500, detail="Service registry not initialized")
     
     try:
         logger.info("Configuration update requested")
@@ -462,20 +478,119 @@ async def update_configuration(request: ConfigRequest):
         with open(user_config_file, 'w') as f:
             yaml.dump(current_user_config, f, default_flow_style=False, indent=2)
         
-        # Reload configuration
-        config_loader.reload_configuration()
+        # Initiate hot-reload using the new system
+        reload_context = await config_loader.reload_configuration()
         
-        # Clear provider cache to pick up new settings
-        if ai_service:
-            ai_service.clear_provider_cache()
-        
-        logger.info("Configuration updated successfully")
-        
-        # Return updated configuration (redacted)
-        return await get_configuration()
+        if reload_context.status == "completed":
+            logger.info(f"Configuration hot-reload completed successfully (version {reload_context.version})")
+            # Return updated configuration (redacted)
+            return await get_configuration()
+        else:
+            logger.error(f"Configuration hot-reload failed: {reload_context.errors}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Configuration reload failed: {'; '.join(reload_context.errors)}"
+            )
         
     except Exception as e:
         logger.error(f"Configuration update failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/config/reload/status")
+async def get_reload_status():
+    """Get the status of the current or last configuration reload operation."""
+    global service_registry
+    
+    if not service_registry:
+        raise HTTPException(status_code=500, detail="Service registry not initialized")
+    
+    try:
+        reload_context = service_registry.get_current_reload_context()
+        is_reload_in_progress = service_registry.is_reload_in_progress()
+        
+        if reload_context:
+            return {
+                "reload_in_progress": is_reload_in_progress,
+                "current_context": {
+                    "version": reload_context.version,
+                    "status": reload_context.status,
+                    "errors": reload_context.errors,
+                    "start_time": reload_context.start_time
+                },
+                "config_version": config_loader.get_config_version()
+            }
+        else:
+            return {
+                "reload_in_progress": is_reload_in_progress,
+                "current_context": None,
+                "config_version": config_loader.get_config_version()
+            }
+    
+    except Exception as e:
+        logger.error(f"Failed to get reload status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/config/reload")
+async def trigger_config_reload():
+    """Manually trigger a configuration reload from files."""
+    global service_registry
+    
+    if not service_registry:
+        raise HTTPException(status_code=500, detail="Service registry not initialized")
+    
+    try:
+        logger.info("Manual configuration reload triggered")
+        
+        # Trigger reload from files (no new config data provided)
+        reload_context = await config_loader.reload_configuration()
+        
+        return {
+            "status": "success" if reload_context.status == "completed" else "failed",
+            "reload_context": {
+                "version": reload_context.version,
+                "status": reload_context.status,
+                "errors": reload_context.errors
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Manual configuration reload failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/services/registry")
+async def get_service_registry_status():
+    """Get status of all registered services in the registry."""
+    global service_registry
+    
+    if not service_registry:
+        raise HTTPException(status_code=500, detail="Service registry not initialized")
+    
+    try:
+        services = {}
+        for service_name in ["config_loader", "ai_service"]:
+            service = service_registry.get_service(service_name)
+            if service:
+                services[service_name] = {
+                    "registered": True,
+                    "type": type(service).__name__
+                }
+            else:
+                services[service_name] = {
+                    "registered": False,
+                    "type": None
+                }
+        
+        return {
+            "status": "success",
+            "services": services,
+            "reload_in_progress": service_registry.is_reload_in_progress()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get service registry status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

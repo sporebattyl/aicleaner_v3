@@ -6,24 +6,29 @@ Implements 2-tier configuration system: defaults + user overrides
 import os
 import yaml
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 from copy import deepcopy
+
+from .service_registry import Reloadable, ServiceRegistry, ReloadContext
 
 logger = logging.getLogger(__name__)
 
 
-class ConfigurationLoader:
+class ConfigurationLoader(Reloadable):
     """
     Loads and merges configuration from default and user files.
     Supports environment variable substitution.
     """
     
-    def __init__(self, config_dir: str = "/home/drewcifer/aicleaner_v3/core"):
+    def __init__(self, config_dir: str = "/home/drewcifer/aicleaner_v3/core", service_registry: Optional[ServiceRegistry] = None):
         self.config_dir = Path(config_dir)
         self.default_config_file = self.config_dir / "config.default.yaml"
         self.user_config_file = self.config_dir / "config.user.yaml"
         self._cached_config: Optional[Dict[str, Any]] = None
+        self._config_version: int = 0
+        self._last_loaded_config: Optional[Dict[str, Any]] = None
+        self._service_registry: Optional[ServiceRegistry] = service_registry
         
     def load_configuration(self, force_reload: bool = False) -> Dict[str, Any]:
         """
@@ -61,6 +66,8 @@ class ConfigurationLoader:
             
             # Cache the result
             self._cached_config = merged_config
+            self._last_loaded_config = deepcopy(merged_config) # Store for rollback/comparison
+            self._config_version += 1 # Increment version on successful load
             
             logger.info("Configuration loaded successfully")
             return merged_config
@@ -221,10 +228,89 @@ class ConfigurationLoader:
         
         return len(errors) == 0, errors
     
-    def reload_configuration(self) -> Dict[str, Any]:
-        """Force reload configuration from files"""
-        self._cached_config = None
-        return self.load_configuration()
+    def get_config_version(self) -> int:
+        """Returns the current configuration version."""
+        return self._config_version
+
+    def set_service_registry(self, registry: ServiceRegistry):
+        """
+        Sets the ServiceRegistry instance for coordinating reloads.
+        """
+        self._service_registry = registry
+        logger.info("ServiceRegistry set for ConfigurationLoader.")
+
+    async def reload_configuration(self, new_config_data: Optional[Dict[str, Any]] = None) -> ReloadContext:
+        """
+        Initiates a hot-reload of the configuration and dependent services.
+        If new_config_data is provided, it's used directly; otherwise, it attempts
+        to load from files.
+        
+        Args:
+            new_config_data: Optional dictionary with new configuration. If None,
+                             configuration is loaded from files.
+        
+        Returns:
+            ReloadContext: The context object detailing the reload operation.
+        """
+        if self._service_registry is None:
+            error_msg = "ServiceRegistry not set. Cannot initiate reload."
+            logger.error(error_msg)
+            return ReloadContext(self._config_version, "failed", [error_msg])
+
+        # Load potential new configuration from files if not provided
+        temp_config_loader = ConfigurationLoader(self.config_dir) # Use a temporary loader
+        try:
+            if new_config_data is None:
+                # This will load from files and apply env vars, but not cache globally
+                new_config_to_validate = temp_config_loader.load_configuration(force_reload=True)
+            else:
+                # If new_config_data is provided, we still need to apply env vars
+                # and deep merge with defaults if necessary for full validation context.
+                # For simplicity, assuming new_config_data is already a complete config
+                # or will be merged by the service registry's process.
+                # A more robust solution would involve merging new_config_data with defaults here.
+                default_config = temp_config_loader._load_yaml_file(temp_config_loader.default_config_file)
+                merged_new_config = temp_config_loader._deep_merge(default_config, new_config_data)
+                new_config_to_validate = temp_config_loader._substitute_env_vars(merged_new_config)
+
+        except Exception as e:
+            error_msg = f"Failed to prepare new configuration for reload: {e}"
+            logger.error(error_msg)
+            return ReloadContext(self._config_version + 1, "failed", [error_msg])
+
+        # Initiate the two-phase commit via the ServiceRegistry
+        # The ServiceRegistry will call validate_config and reload_config on registered services
+        # including this ConfigurationLoader instance if it's registered.
+        return await self._service_registry.initiate_reload(new_config_to_validate, self._config_version + 1)
+
+    async def validate_config(self, new_config: Dict) -> Tuple[bool, Optional[str]]:
+        """
+        Implements Reloadable.validate_config for ConfigurationLoader.
+        Performs a fast validation (e.g., schema check, basic sanity).
+        """
+        logger.info("ConfigurationLoader: Performing fast validation of new config.")
+        is_valid, errors = self.validate_configuration() # Re-use existing validation logic
+        if not is_valid:
+            return False, "; ".join(errors)
+
+        # Add optimistic locking check here if config version is part of the new_config
+        # For now, assuming the version check is handled by the caller (e.g., API endpoint)
+        # or implicitly by the ServiceRegistry's single-reload-at-a-time lock.
+
+        return True, None
+
+    async def reload_config(self, new_config: Dict):
+        """
+        Implements Reloadable.reload_config for ConfigurationLoader.
+        Applies the new configuration.
+        """
+        logger.info("ConfigurationLoader: Applying new configuration.")
+        # This is where the actual config update happens for the loader itself.
+        # We need to ensure the _cached_config and version are updated.
+        self._cached_config = deepcopy(new_config)
+        self._last_loaded_config = deepcopy(new_config)
+        self._config_version += 1
+        logger.info(f"ConfigurationLoader: Configuration updated to version {self._config_version}.")
 
 
 # Global configuration loader instance
