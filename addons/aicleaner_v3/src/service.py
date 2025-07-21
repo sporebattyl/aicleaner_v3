@@ -19,6 +19,10 @@ from .ai_provider import AIService
 from .metrics_manager import MetricsManager
 from .service_registry import ServiceRegistry, ReloadContext
 from .performance_manager import PerformanceManager
+from .security_manager import SecurityManager
+from .backup_manager import BackupManager
+from .monitoring_system import ConfigurableMonitor
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +33,9 @@ ai_service: Optional[AIService] = None
 metrics_manager: Optional[MetricsManager] = None
 service_registry: Optional[ServiceRegistry] = None
 performance_manager: Optional[PerformanceManager] = None
+security_manager: Optional[SecurityManager] = None
+backup_manager: Optional[BackupManager] = None
+monitoring_system: Optional[ConfigurableMonitor] = None
 service_metrics = {
     'start_time': time.time(),
     'total_requests': 0,
@@ -46,6 +53,7 @@ service_metrics = {
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     global ai_service, metrics_manager, service_registry, performance_manager
+    global security_manager, backup_manager, monitoring_system
     
     # Startup
     logger.info("Starting AICleaner v3 Core Service")
@@ -67,6 +75,18 @@ async def lifespan(app: FastAPI):
         
         # Initialize AI service
         ai_service = AIService(config_loader)
+        
+        # Initialize Security Manager
+        security_manager = SecurityManager(Path.home() / ".homeassistant", config.get('security', {}))
+        await security_manager.initialize()
+        
+        # Initialize Backup Manager
+        backup_manager = BackupManager(Path.home() / ".homeassistant", config.get('backup', {}))
+        await backup_manager.initialize()
+        
+        # Initialize Monitoring System
+        monitoring_system = ConfigurableMonitor(Path.home() / ".homeassistant", config.get('monitoring', {}))
+        await monitoring_system.initialize()
         
         # Initialize Performance Manager
         performance_manager = PerformanceManager(config, ai_service)
@@ -91,6 +111,17 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    if monitoring_system:
+        await monitoring_system.shutdown()
+    
+    if backup_manager:
+        # Don't need explicit shutdown for backup_manager
+        pass
+    
+    if security_manager:
+        # Don't need explicit shutdown for security_manager
+        pass
+    
     if performance_manager:
         await performance_manager.shutdown()
     
@@ -1095,6 +1126,323 @@ async def get_best_ollama_model(request: Dict[str, Any]):
         raise
     except Exception as e:
         logger.error(f"Best model selection failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Phase 3C.3: Live HA Deployment Validation Endpoints ---
+
+@app.get("/v1/deployment/status")
+async def get_deployment_status():
+    """Get overall deployment validation status"""
+    global security_manager, backup_manager, monitoring_system
+    
+    try:
+        status_data = {
+            "deployment_environment": "production",
+            "components": {
+                "security_manager": security_manager is not None,
+                "backup_manager": backup_manager is not None,
+                "monitoring_system": monitoring_system is not None,
+                "performance_manager": performance_manager is not None
+            },
+            "overall_health": "healthy"
+        }
+        
+        # Get security status if available
+        if security_manager:
+            security_status = await security_manager.get_security_status()
+            status_data["security"] = security_status
+        
+        # Get monitoring status if available
+        if monitoring_system:
+            monitoring_status = await monitoring_system.get_monitoring_status()
+            status_data["monitoring"] = {
+                "current_level": monitoring_status.current_level.value,
+                "active_alerts": monitoring_status.active_alerts,
+                "system_health_score": monitoring_status.system_health_score
+            }
+        
+        # Get backup status if available
+        if backup_manager:
+            backup_list = await backup_manager.list_backups()
+            status_data["backup"] = {
+                "total_backups": len(backup_list),
+                "last_backup": backup_list[0].created_at.isoformat() if backup_list else None
+            }
+        
+        return {"status": "success", "deployment_status": status_data}
+        
+    except Exception as e:
+        logger.error(f"Deployment status check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/security/status")
+async def get_security_status():
+    """Get security manager status"""
+    global security_manager
+    
+    if not security_manager:
+        raise HTTPException(status_code=500, detail="Security manager not initialized")
+    
+    try:
+        status = await security_manager.get_security_status()
+        return {"status": "success", "security_status": status}
+        
+    except Exception as e:
+        logger.error(f"Security status retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/security/secrets", dependencies=[Depends(get_api_key_or_allow_local)])
+async def store_external_secret(request: Dict[str, str]):
+    """Store an external secret (API key, etc.)"""
+    global security_manager
+    
+    if not security_manager:
+        raise HTTPException(status_code=500, detail="Security manager not initialized")
+    
+    secret_name = request.get('name')
+    secret_value = request.get('value')
+    validate = request.get('validate', True)
+    
+    if not secret_name or not secret_value:
+        raise HTTPException(status_code=400, detail="Secret name and value required")
+    
+    try:
+        success = await security_manager.store_external_secret(secret_name, secret_value, validate)
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"Secret '{secret_name}' stored successfully"
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Failed to store secret (validation failed)")
+        
+    except Exception as e:
+        logger.error(f"Secret storage failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/backup/create", dependencies=[Depends(get_api_key_or_allow_local)])
+async def create_backup(request: Dict[str, str]):
+    """Create a new backup"""
+    global backup_manager
+    
+    if not backup_manager:
+        raise HTTPException(status_code=500, detail="Backup manager not initialized")
+    
+    from .backup_manager import BackupType
+    
+    backup_type_str = request.get('type', 'full')
+    description = request.get('description', '')
+    
+    try:
+        backup_type = BackupType(backup_type_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid backup type: {backup_type_str}")
+    
+    try:
+        backup_id = await backup_manager.create_backup(backup_type, description)
+        
+        if backup_id:
+            return {
+                "status": "success",
+                "backup_id": backup_id,
+                "message": f"Backup created successfully: {backup_id}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Backup creation failed")
+        
+    except Exception as e:
+        logger.error(f"Backup creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/backup/list")
+async def list_backups():
+    """List all available backups"""
+    global backup_manager
+    
+    if not backup_manager:
+        raise HTTPException(status_code=500, detail="Backup manager not initialized")
+    
+    try:
+        backups = await backup_manager.list_backups()
+        
+        backup_list = []
+        for backup in backups:
+            backup_list.append({
+                "backup_id": backup.backup_id,
+                "backup_type": backup.backup_type.value,
+                "created_at": backup.created_at.isoformat(),
+                "size_bytes": backup.size_bytes,
+                "description": backup.description,
+                "components": backup.components
+            })
+        
+        return {
+            "status": "success",
+            "backups": backup_list,
+            "total_count": len(backup_list)
+        }
+        
+    except Exception as e:
+        logger.error(f"Backup listing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/backup/restore", dependencies=[Depends(get_api_key_or_allow_local)])
+async def restore_backup(request: Dict[str, str]):
+    """Restore from backup"""
+    global backup_manager
+    
+    if not backup_manager:
+        raise HTTPException(status_code=500, detail="Backup manager not initialized")
+    
+    from .backup_manager import RecoveryMode
+    
+    backup_id = request.get('backup_id')
+    recovery_mode_str = request.get('recovery_mode', 'full')
+    force = request.get('force', False)
+    
+    if not backup_id:
+        raise HTTPException(status_code=400, detail="Backup ID required")
+    
+    try:
+        recovery_mode = RecoveryMode(recovery_mode_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid recovery mode: {recovery_mode_str}")
+    
+    try:
+        result = await backup_manager.restore_backup(backup_id, recovery_mode, force)
+        
+        return {
+            "status": "success" if result.success else "failed",
+            "restored_components": result.restored_components,
+            "failed_components": result.failed_components,
+            "warnings": result.warnings,
+            "errors": result.errors,
+            "recovery_mode": result.recovery_mode.value
+        }
+        
+    except Exception as e:
+        logger.error(f"Backup restore failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/monitoring/status")
+async def get_monitoring_status():
+    """Get monitoring system status"""
+    global monitoring_system
+    
+    if not monitoring_system:
+        raise HTTPException(status_code=500, detail="Monitoring system not initialized")
+    
+    try:
+        status = await monitoring_system.get_monitoring_status()
+        
+        return {
+            "status": "success",
+            "monitoring_status": {
+                "current_level": status.current_level.value,
+                "active_alerts": status.active_alerts,
+                "critical_alerts": status.critical_alerts,
+                "system_health_score": status.system_health_score,
+                "uptime_seconds": status.uptime_seconds,
+                "auto_escalation_enabled": status.auto_escalation_enabled
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Monitoring status retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/monitoring/level", dependencies=[Depends(get_api_key_or_allow_local)])
+async def set_monitoring_level(request: Dict[str, Any]):
+    """Set monitoring level"""
+    global monitoring_system
+    
+    if not monitoring_system:
+        raise HTTPException(status_code=500, detail="Monitoring system not initialized")
+    
+    from .monitoring_system import MonitoringLevel
+    
+    level_str = request.get('level')
+    manual_override = request.get('manual_override', False)
+    
+    if not level_str:
+        raise HTTPException(status_code=400, detail="Monitoring level required")
+    
+    try:
+        level = MonitoringLevel(level_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid monitoring level: {level_str}")
+    
+    try:
+        success = await monitoring_system.set_monitoring_level(level, manual_override)
+        
+        return {
+            "status": "success" if success else "failed",
+            "message": f"Monitoring level set to {level.value}",
+            "manual_override": manual_override
+        }
+        
+    except Exception as e:
+        logger.error(f"Monitoring level change failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/monitoring/alerts")
+async def get_monitoring_alerts():
+    """Get active monitoring alerts"""
+    global monitoring_system
+    
+    if not monitoring_system:
+        raise HTTPException(status_code=500, detail="Monitoring system not initialized")
+    
+    try:
+        alerts = await monitoring_system.get_active_alerts()
+        
+        alert_list = []
+        for alert in alerts:
+            alert_list.append({
+                "alert_id": alert.alert_id,
+                "severity": alert.severity.value,
+                "title": alert.title,
+                "message": alert.message,
+                "timestamp": alert.timestamp.isoformat(),
+                "acknowledged": alert.acknowledged,
+                "escalated": alert.escalated
+            })
+        
+        return {
+            "status": "success",
+            "alerts": alert_list,
+            "total_count": len(alert_list)
+        }
+        
+    except Exception as e:
+        logger.error(f"Alert retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/monitoring/ha-sensors")
+async def get_ha_monitoring_sensors():
+    """Get monitoring data formatted for Home Assistant sensors"""
+    global monitoring_system
+    
+    if not monitoring_system:
+        raise HTTPException(status_code=500, detail="Monitoring system not initialized")
+    
+    try:
+        ha_sensors = await monitoring_system.get_metrics_for_ha()
+        return {"status": "success", "sensors": ha_sensors}
+        
+    except Exception as e:
+        logger.error(f"HA sensors retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

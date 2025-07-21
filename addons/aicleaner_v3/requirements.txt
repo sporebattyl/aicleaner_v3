@@ -16,3 +16,8 @@ psutil>=5.9.0
 
 # For local model support
 ollama>=0.1.7
+
+# For Phase 3C.3 deployment validation components
+cryptography>=3.4.8
+fastapi>=0.100.0
+uvicorn>=0.18.0
