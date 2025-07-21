@@ -1,0 +1,10 @@
+{
+  "domain": "aicleaner_v3",
+  "name": "AI Cleaner v3",
+  "codeowners": ["@drewcifer"],
+  "config_flow": true,
+  "documentation": "https://github.com/drewcifer/aicleaner_v3/blob/main/README.md",
+  "issue_tracker": "https://github.com/drewcifer/aicleaner_v3/issues",
+  "requirements": ["aiohttp"],
+  "version": "0.0.1"
+}

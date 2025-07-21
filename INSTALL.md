@@ -51,31 +51,18 @@ Before installing AICleaner v3, ensure your system meets the following requireme
 
 ```yaml
 log_level: info
-ai_providers:
-  - provider: openai
-    enabled: true
-    api_key: "your-openai-api-key-here"
-    model: "gpt-4o"
-  - provider: gemini
-    enabled: false
-    api_key: "your-gemini-api-key-here"
-    model: "gemini-1.5-pro"
-zones:
-  - name: "Living Room"
-    enabled: true
-    devices: []
-security:
-  enabled: true
-  audit_logging: true
-performance:
-  auto_optimization: true
-  resource_monitoring: true
-  caching: true
+primary_api_key: "your-api-key-here"
+backup_api_keys:
+  - "backup-key-1"
+  - "backup-key-2"
+device_id: "aicleaner_v3"
+mqtt_discovery_prefix: "homeassistant"
 ```
 
-3. Replace `"your-openai-api-key-here"` with your actual OpenAI API key
-4. Add additional AI providers as needed
-5. Click **Save**
+3. Replace `"your-api-key-here"` with your actual AI provider API key
+4. Add backup API keys for failover (optional)
+5. Customize device_id if you have multiple instances
+6. Click **Save**
 
 #### Step 4: Start the Add-on
 

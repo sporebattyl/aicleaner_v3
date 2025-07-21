@@ -1,36 +1,11 @@
-# AICleaner v3 Multi-Tier System Requirements
+# AICleaner v3 - Simplified Dependencies
+# Core service requirements
 
-# Privacy Pipeline Dependencies
-opencv-python>=4.8.0
-Pillow>=10.0.0
-numpy>=1.24.0
-torch>=2.0.0
-torchvision>=0.15.0
-onnxruntime>=1.16.0
-spacy>=3.7.0
-
-# AMD Optimization Dependencies
-llama-cpp-python[opencl]>=0.2.0
-psutil>=5.9.0
-GPUtil>=1.4.0
-pyyaml>=6.0
-
-# Cloud Integration Dependencies
-aiohttp>=3.8.0
-redis>=5.0.0
-asyncio-throttle>=1.0.2
-
-# General Dependencies
-requests>=2.31.0
-asyncio
-dataclasses
-typing-extensions>=4.0.0
-
-# Web UI Dependencies
 fastapi>=0.104.0
 uvicorn>=0.24.0
-websockets>=12.0
-jinja2>=3.1.2
-
-# Home Assistant Integration
-homeassistant>=2023.12.0
+aiohttp>=3.9.0
+pyyaml>=6.0
+pydantic>=2.0.0
+openai>=1.0.0
+anthropic>=0.5.0
+google-generativeai>=0.3.0

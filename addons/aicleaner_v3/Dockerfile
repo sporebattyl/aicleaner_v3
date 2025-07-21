@@ -1,102 +1,45 @@
-# Multi-stage build for optimized AICleaner v3 container
-# Stage 1: Build dependencies
-FROM python:3.11-alpine AS builder
+ARG BUILD_FROM=python:3.11-alpine
+FROM ${BUILD_FROM}
 
-# Install build dependencies
+# Install bash first (needed for shell setting)
+RUN apk add --no-cache bash
+
+# Set shell
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Install remaining system dependencies
 RUN apk add --no-cache \
-    gcc \
-    musl-dev \
-    linux-headers \
-    jpeg-dev \
-    zlib-dev \
-    freetype-dev \
-    lcms2-dev \
-    openjpeg-dev \
-    tiff-dev \
-    tk-dev \
-    tcl-dev \
-    git \
+    jq \
+    python3 \
+    py3-pip \
     curl
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Set up a non-root user for security
+RUN addgroup -S app && adduser -S -G app app
+
+# Set working directory
+WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime image
-ARG BUILD_FROM
-FROM $BUILD_FROM
+# Copy the application source code
+COPY src/ ./src/
 
-# Install runtime dependencies only
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    jpeg \
-    zlib \
-    freetype \
-    lcms2 \
-    openjpeg \
-    tiff \
-    curl \
-    bash
+# Copy and set permissions for run script
+COPY run.sh /
+RUN chmod +x /run.sh
 
-# Copy virtual environment from builder stage
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Create data directories with proper permissions
+RUN mkdir -p /data /config && chown -R app:app /data /config /app
 
-# Set the working directory
-WORKDIR /app
+# Switch to non-root user
+USER app
 
-# Create necessary directories
-RUN mkdir -p /app/www \
-    /data/cache \
-    /data/snapshots \
-    /data/aicleaner \
-    /config \
-    /logs
+# Health check - verify main process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD ps aux | grep -v grep | grep "python.*src/main.py" || exit 1
 
-# Copy application files with proper structure
-COPY *.py ./
-COPY ai/ ./ai/
-COPY core/ ./core/
-COPY integrations/ ./integrations/
-COPY gamification/ ./gamification/
-COPY notifications/ ./notifications/
-COPY rules/ ./rules/
-COPY utils/ ./utils/
-COPY mobile/ ./mobile/
-COPY mqtt/ ./mqtt/
-COPY tests/ ./tests/
-COPY www/ ./www/
-COPY config.yaml ./
-COPY config.json ./
-COPY run.sh ./
-COPY utils/services.yaml ./
-
-# Make scripts executable
-RUN chmod +x run.sh
-
-# Set environment variables for Docker deployment
-ENV PYTHONPATH="/app:$PYTHONPATH" \
-    PYTHONUNBUFFERED=1 \
-    AICLEANER_DATA_PATH="/data/aicleaner" \
-    AICLEANER_LOG_LEVEL="INFO" \
-    AICLEANER_PRIVACY_LEVEL="standard"
-
-# Health check for container monitoring
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python3 -c "import requests; requests.get('http://localhost:8099', timeout=5)" || exit 1
-
-# Expose ports
-EXPOSE 8099
-
-# Set proper ownership and permissions
-RUN chown -R root:root /app && \
-    chmod -R 755 /app
-
-# Start the application
-CMD ["./run.sh"]
+# Set the entrypoint
+CMD [ "/run.sh" ]
