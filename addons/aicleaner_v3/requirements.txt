@@ -10,3 +10,9 @@ requests>=2.28.0
 
 # Use pydantic 1.x to avoid conflicts
 pydantic>=1.9.0,<2.0.0
+
+# For resource monitoring
+psutil>=5.9.0
+
+# For local model support
+ollama>=0.1.7

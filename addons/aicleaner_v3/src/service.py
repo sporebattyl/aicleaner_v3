@@ -18,6 +18,7 @@ from .config_loader import config_loader
 from .ai_provider import AIService
 from .metrics_manager import MetricsManager
 from .service_registry import ServiceRegistry, ReloadContext
+from .performance_manager import PerformanceManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 ai_service: Optional[AIService] = None
 metrics_manager: Optional[MetricsManager] = None
 service_registry: Optional[ServiceRegistry] = None
+performance_manager: Optional[PerformanceManager] = None
 service_metrics = {
     'start_time': time.time(),
     'total_requests': 0,
@@ -43,7 +45,7 @@ service_metrics = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global ai_service, metrics_manager, service_registry
+    global ai_service, metrics_manager, service_registry, performance_manager
     
     # Startup
     logger.info("Starting AICleaner v3 Core Service")
@@ -66,6 +68,10 @@ async def lifespan(app: FastAPI):
         # Initialize AI service
         ai_service = AIService(config_loader)
         
+        # Initialize Performance Manager
+        performance_manager = PerformanceManager(config, ai_service)
+        await performance_manager.initialize()
+        
         # Initialize Metrics Manager
         metrics_manager = MetricsManager(config)
         await metrics_manager.start_background_task()
@@ -73,6 +79,7 @@ async def lifespan(app: FastAPI):
         # Register services with the registry
         service_registry.register_service("config_loader", config_loader)
         service_registry.register_service("ai_service", ai_service, dependencies=["config_loader"])
+        service_registry.register_service("performance_manager", performance_manager, dependencies=["config_loader", "ai_service"])
         # Note: metrics_manager doesn't implement Reloadable yet, could be added later
         
         logger.info("Core service initialized successfully")
@@ -84,6 +91,9 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    if performance_manager:
+        await performance_manager.shutdown()
+    
     if metrics_manager:
         await metrics_manager.stop_background_task()
     
@@ -267,12 +277,24 @@ async def get_api_key_or_allow_local(
 @app.post("/v1/generate", response_model=GenerateResponse)
 async def generate_text(request: GenerateRequest):
     """Generate text using specified AI provider and model configuration."""
-    global ai_service, service_metrics, metrics_manager
+    global ai_service, service_metrics, metrics_manager, performance_manager
     
     if not ai_service:
         raise HTTPException(status_code=500, detail="AI service not initialized")
     
     try:
+        # Use intelligent routing if performance manager is available
+        optimal_provider = None
+        if performance_manager:
+            request_data = {
+                "prompt": request.prompt,
+                "type": "text"
+            }
+            optimal_provider = await performance_manager.get_optimal_provider(request_data)
+        
+        # Use optimal provider if found, otherwise use requested provider
+        provider_to_use = optimal_provider or request.provider
+        
         # Prepare parameters
         kwargs = {}
         if request.temperature is not None:
@@ -283,12 +305,24 @@ async def generate_text(request: GenerateRequest):
             kwargs.update(request.provider_params)
         
         # Generate response
+        start_time = time.time()
         response = await ai_service.generate(
             prompt=request.prompt,
-            provider=request.provider,
+            provider=provider_to_use,
             model=request.model,
             **kwargs
         )
+        response_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Record performance metrics if performance manager is available
+        if performance_manager:
+            await performance_manager.intelligent_router.record_request_result(
+                provider=response.provider,
+                request_data=request_data,
+                response_time=response_time / 1000,  # Convert back to seconds
+                success=True,
+                cost=response.cost.get('amount', 0.0)
+            )
         
         # Update metrics
         provider_name = response.provider
@@ -870,6 +904,197 @@ async def recover_provider(request: Dict[str, str]):
         
     except Exception as e:
         logger.error(f"Provider recovery failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Performance Optimization Endpoints ---
+
+@app.get("/v1/performance/metrics")
+async def get_performance_metrics():
+    """Get comprehensive performance optimization metrics"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    try:
+        metrics = await performance_manager.get_performance_metrics()
+        return {"status": "success", "metrics": metrics}
+        
+    except Exception as e:
+        logger.error(f"Performance metrics retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/performance/optimize", dependencies=[Depends(get_api_key_or_allow_local)])
+async def optimize_provider(request: Dict[str, Any]):
+    """Schedule optimization for a provider"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    provider = request.get('provider')
+    optimization_type = request.get('type', 'auto')
+    
+    if not provider:
+        raise HTTPException(status_code=400, detail="Provider name required")
+    
+    try:
+        task_id = await performance_manager.optimize_provider(provider, optimization_type)
+        
+        return {
+            "status": "success",
+            "message": f"Optimization scheduled for provider: {provider}",
+            "task_id": task_id,
+            "optimization_type": optimization_type
+        }
+        
+    except Exception as e:
+        logger.error(f"Provider optimization failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/performance/optimize/{task_id}")
+async def get_optimization_status(task_id: str):
+    """Get the status of an optimization task"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    try:
+        task = await performance_manager.get_optimization_status(task_id)
+        
+        if not task:
+            raise HTTPException(status_code=404, detail="Optimization task not found")
+        
+        return {
+            "status": "success",
+            "task": {
+                "id": task.id,
+                "type": task.task_type,
+                "status": task.status.value,
+                "progress": task.progress,
+                "start_time": task.start_time.isoformat() if task.start_time else None,
+                "end_time": task.end_time.isoformat() if task.end_time else None,
+                "error_message": task.error_message,
+                "result": task.result
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Optimization status retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/performance/hot-swap", dependencies=[Depends(get_api_key_or_allow_local)])
+async def hot_swap_optimization(request: Dict[str, Any]):
+    """Perform hot-swap of optimization configuration"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    provider = request.get('provider')
+    new_config = request.get('config', {})
+    
+    if not provider:
+        raise HTTPException(status_code=400, detail="Provider name required")
+    
+    try:
+        success = await performance_manager.hot_swap_optimization(provider, new_config)
+        
+        return {
+            "status": "success" if success else "failed",
+            "message": f"Hot-swap {'completed' if success else 'failed'} for provider: {provider}",
+            "provider": provider
+        }
+        
+    except Exception as e:
+        logger.error(f"Hot-swap optimization failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/performance/routing/metrics")
+async def get_routing_metrics():
+    """Get intelligent routing performance metrics"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    try:
+        routing_metrics = await performance_manager.intelligent_router.get_metrics()
+        return {"status": "success", "routing_metrics": routing_metrics}
+        
+    except Exception as e:
+        logger.error(f"Routing metrics retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/performance/ollama/status")
+async def get_ollama_optimization_status():
+    """Get Ollama-specific optimization status"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    try:
+        ollama_optimizer = performance_manager.optimizers.get("ollama")
+        if not ollama_optimizer:
+            raise HTTPException(status_code=404, detail="Ollama optimizer not found")
+        
+        status = await ollama_optimizer.get_optimization_status()
+        performance_metrics = await ollama_optimizer.get_performance_metrics()
+        
+        return {
+            "status": "success",
+            "ollama_status": status,
+            "performance_metrics": performance_metrics
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ollama status retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/performance/ollama/model-selection", dependencies=[Depends(get_api_key_or_allow_local)])
+async def get_best_ollama_model(request: Dict[str, Any]):
+    """Get the best Ollama model for a task"""
+    global performance_manager
+    
+    if not performance_manager:
+        raise HTTPException(status_code=500, detail="Performance manager not initialized")
+    
+    task_complexity = request.get('complexity', 'medium')
+    max_response_time = request.get('max_response_time', 30.0)
+    
+    try:
+        ollama_optimizer = performance_manager.optimizers.get("ollama")
+        if not ollama_optimizer:
+            raise HTTPException(status_code=404, detail="Ollama optimizer not found")
+        
+        best_model = await ollama_optimizer.get_best_model_for_task(
+            task_complexity, max_response_time
+        )
+        
+        return {
+            "status": "success",
+            "best_model": best_model,
+            "task_complexity": task_complexity,
+            "max_response_time": max_response_time
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Best model selection failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
