@@ -409,8 +409,17 @@ class OpenAIProvider(AIProvider):
             
         except ImportError:
             raise ValueError("OpenAI library not installed. Run: pip install openai")
+        except ValueError as e:
+            logger.error(f"OpenAI configuration error: {e}")
+            raise
+        except ConnectionError as e:
+            logger.error(f"OpenAI connection error: {e}")
+            raise
+        except TimeoutError as e:
+            logger.error(f"OpenAI request timeout: {e}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
+            logger.error(f"Unexpected OpenAI error: {e}", exc_info=True)
             raise
 
 
@@ -484,8 +493,17 @@ class AnthropicProvider(AIProvider):
             
         except ImportError:
             raise ValueError("Anthropic library not installed. Run: pip install anthropic")
+        except ValueError as e:
+            logger.error(f"Anthropic configuration error: {e}")
+            raise
+        except ConnectionError as e:
+            logger.error(f"Anthropic connection error: {e}")
+            raise
+        except TimeoutError as e:
+            logger.error(f"Anthropic request timeout: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Anthropic API error: {e}")
+            logger.error(f"Unexpected Anthropic error: {e}", exc_info=True)
             raise
 
 

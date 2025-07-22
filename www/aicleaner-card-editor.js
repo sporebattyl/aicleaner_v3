@@ -180,9 +180,16 @@ class AICleanerCardEditor extends HTMLElement {
         }
 
         const target = ev.target;
-        const configValue = target.type === 'checkbox' ? target.checked : target.value;
+        let configValue = target.type === 'checkbox' ? target.checked : target.value;
         
-        if (this[`_${target.id}`] === configValue) {
+        // Get current config value with proper type conversion
+        let currentValue = this._config[target.id];
+        if (target.type === 'number') {
+            currentValue = currentValue !== undefined ? Number(currentValue) : undefined;
+            configValue = Number(configValue);
+        }
+        
+        if (currentValue === configValue) {
             return;
         }
         

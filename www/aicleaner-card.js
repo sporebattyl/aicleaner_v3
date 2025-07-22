@@ -1428,9 +1428,9 @@ class AICleanerCard extends HTMLElement {
                         <h4>Todo List Configuration</h4>
                         <div class="review-item">
                             <span class="review-label">Todo Entity:</span>
-                            <span class="review-value ${zone.todo_list_entity ? 'valid' : 'optional'}">
-                                ${zone.todo_list_entity || 'Not configured (optional)'}
-                                ${zone.todo_list_entity ? '✅' : 'ℹ️'}
+                            <span class="review-value ${zone.todo_list_entity ? 'valid' : 'error'}">
+                                ${zone.todo_list_entity || 'REQUIRED - Not configured'}
+                                ${zone.todo_list_entity ? '✅' : '❌'}
                             </span>
                         </div>
                     </div>
@@ -1590,6 +1590,7 @@ class AICleanerCard extends HTMLElement {
         if (!zone.name) errors.push('Zone name is required');
         if (!zone.displayName) errors.push('Display name is required');
         if (!zone.camera_entity) errors.push('Camera entity is required');
+        if (!zone.todo_list_entity) errors.push('Todo list entity is required for task management');
 
         if (zone.camera_entity && !this._hass.states[zone.camera_entity]) {
             errors.push('Camera entity does not exist in Home Assistant');
@@ -2377,6 +2378,41 @@ class AICleanerCard extends HTMLElement {
 
                 .action-button.error:hover {
                     background: var(--error-color-dark, #e64a19);
+                }
+
+                .troubleshoot-button {
+                    position: relative;
+                    overflow: hidden;
+                    font-weight: 600;
+                }
+
+                .troubleshoot-button:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+
+                .action-button.primary {
+                    background: var(--primary-color, #03a9f4);
+                    color: white;
+                }
+
+                .action-button.primary:hover {
+                    background: var(--primary-color-dark, #0288d1);
+                }
+
+                .action-button.warning {
+                    background: var(--warning-color, #ff9800);
+                    color: white;
+                }
+
+                .action-button.warning:hover {
+                    background: var(--warning-color-dark, #f57c00);
+                }
+
+                .button-icon {
+                    display: inline-block;
+                    margin-right: 6px;
+                    font-size: 0.9em;
                 }
 
                 .zone-name {
@@ -3526,6 +3562,10 @@ class AICleanerCard extends HTMLElement {
                 .review-value.optional {
                     color: var(--info-color, #2196f3);
                 }
+                .review-value.error {
+                    color: var(--error-color, #f44336);
+                    font-weight: bold;
+                }
 
                 .setup-next-steps {
                     background: var(--info-background, rgba(33, 150, 243, 0.1));
@@ -3822,8 +3862,10 @@ class AICleanerCard extends HTMLElement {
      * Render individual zone card
      */
     renderZoneCard(zone) {
-        // Check if zone has configuration errors
-        if (zone.configurationStatus === 'invalid') {
+        // Check if zone has configuration errors or needs setup
+        if (zone.configurationStatus === 'invalid' || 
+            zone.configurationStatus === 'error' || 
+            zone.configurationStatus === 'needs_setup') {
             return this.renderZoneCardWithErrors(zone);
         }
 
@@ -3894,26 +3936,54 @@ class AICleanerCard extends HTMLElement {
     renderZoneCardWithErrors(zone) {
         const zoneIcon = this.getZoneIcon(zone.name);
         const errorCount = zone.configurationErrors ? zone.configurationErrors.length : 0;
+        const status = zone.configurationStatus || 'error';
+        
+        // Determine the appropriate message based on status
+        let errorTitle = 'Configuration Issues:';
+        let errorIcon = '⚠️';
+        if (status === 'needs_setup') {
+            errorTitle = 'Zone Setup Required:';
+            errorIcon = '🔧';
+        } else if (status === 'error') {
+            errorTitle = 'Zone Errors:';
+            errorIcon = '❌';
+        }
 
         return `
             <div class="zone-card zone-card-error" data-zone="${zone.name}">
                 <div class="zone-name">
                     <span class="zone-icon">${zoneIcon}</span>
                     ${zone.displayName}
-                    <span class="error-badge">⚠️ ${errorCount} issue${errorCount !== 1 ? 's' : ''}</span>
+                    <span class="error-badge">${errorIcon} ${errorCount} issue${errorCount !== 1 ? 's' : ''}</span>
                 </div>
                 <div class="zone-error-content">
                     <div class="error-message">
-                        <strong>Configuration Issues:</strong>
+                        <strong>${errorTitle}</strong>
                         <ul class="error-list">
-                            ${zone.configurationErrors.map(error => `<li>${error}</li>`).join('')}
+                            ${zone.configurationErrors && zone.configurationErrors.length > 0 ? 
+                                zone.configurationErrors.map(error => `<li>${error}</li>`).join('') :
+                                `<li>Zone configuration is incomplete or invalid</li>`
+                            }
                         </ul>
                     </div>
                     <div class="zone-error-actions">
-                        <button class="action-button error" data-action="fix-config" data-zone="${zone.name}">
+                        ${status === 'needs_setup' ? `
+                            <button class="action-button primary troubleshoot-button" data-action="setup-zone" data-zone="${zone.name}">
+                                <span class="button-icon">🚀</span>
+                                Complete Setup
+                            </button>
+                        ` : `
+                            <button class="action-button warning troubleshoot-button" data-action="troubleshoot" data-zone="${zone.name}">
+                                <span class="button-icon">🔧</span>
+                                Troubleshoot
+                            </button>
+                        `}
+                        <button class="action-button secondary" data-action="fix-config" data-zone="${zone.name}">
+                            <span class="button-icon">⚙️</span>
                             Fix Configuration
                         </button>
                         <button class="action-button secondary" data-action="hide-zone" data-zone="${zone.name}">
+                            <span class="button-icon">👁️</span>
                             Hide Zone
                         </button>
                     </div>
@@ -4693,6 +4763,34 @@ class AICleanerCard extends HTMLElement {
                     console.error('❌ No method found to execute for button click');
                     console.log('🔧 Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this))
                         .filter(name => typeof this[name] === 'function'));
+                }
+            }
+
+            // Handle action button clicks for zone error actions
+            if (e.target.classList.contains('action-button') && e.target.dataset.action) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const action = e.target.dataset.action;
+                const zoneName = e.target.dataset.zone;
+                
+                console.log('🔧 Action button clicked:', { action, zoneName });
+
+                switch (action) {
+                    case 'troubleshoot':
+                        this.troubleshootZone(zoneName);
+                        break;
+                    case 'setup-zone':
+                        this.setupZone(zoneName);
+                        break;
+                    case 'fix-config':
+                        this.fixZoneConfiguration(zoneName);
+                        break;
+                    case 'hide-zone':
+                        this.hideZone(zoneName);
+                        break;
+                    default:
+                        console.warn('Unknown action:', action);
                 }
             }
         });
@@ -6245,6 +6343,178 @@ Last Analysis: ${this.systemStatus.lastGlobalAnalysis ?
             type: 'custom:aicleaner-card',
             title: 'AICleaner'
         };
+    }
+
+    /**
+     * Client-side error logging for debugging
+     */
+    logClientError(error, context = {}) {
+        console.error("AI Cleaner Card Error:", error, context);
+        
+        // Enhanced error context for debugging
+        const errorInfo = {
+            message: error.message || 'Unknown client error',
+            stack: error.stack,
+            context: context,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
+        
+        console.warn("AI Cleaner Error Details:", errorInfo);
+        
+        // Could be extended to send to backend logging service in production:
+        // fetch('/api/aicleaner/log_error', {
+        //     method: 'POST', 
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify(errorInfo)
+        // }).catch(e => console.error('Failed to send error to backend:', e));
+    }
+
+    /**
+     * Action methods for zone error handling
+     */
+    troubleshootZone(zoneName) {
+        console.log('🔧 Troubleshooting zone:', zoneName);
+        
+        // Find the zone in our zones array
+        const zone = this.zones.find(z => z.name === zoneName);
+        if (!zone) {
+            this.showToast('Zone not found', 'error');
+            return;
+        }
+
+        // Show troubleshooting modal with specific guidance
+        this.showTroubleshootModal(zone);
+    }
+
+    setupZone(zoneName) {
+        console.log('🚀 Setting up zone:', zoneName);
+        
+        // Navigate to setup wizard for this specific zone
+        this.currentView = 'setup';
+        this.setupWizardContext = { 
+            mode: 'edit_zone', 
+            zoneName: zoneName 
+        };
+        this.render();
+    }
+
+    fixZoneConfiguration(zoneName) {
+        console.log('⚙️ Fixing zone configuration:', zoneName);
+        
+        // For now, show guidance on how to fix configuration
+        // In a full implementation, this would open the configuration editor
+        this.showToast(`To fix ${zoneName} configuration:\n\n1. Go to HA Settings → Add-ons\n2. Find AICleaner addon\n3. Edit zone configuration\n4. Restart addon`, 'info', 5000);
+    }
+
+    hideZone(zoneName) {
+        console.log('👁️ Hiding zone:', zoneName);
+        
+        // Remove zone from display (not from config)
+        this.zones = this.zones.filter(z => z.name !== zoneName);
+        this.render();
+        this.showToast(`Zone "${zoneName}" hidden from display`, 'info');
+    }
+
+    showTroubleshootModal(zone) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+
+        const errorList = zone.configurationErrors && zone.configurationErrors.length > 0 ? 
+            zone.configurationErrors.map(error => `<li style="margin: 8px 0; color: #d32f2f;">${error}</li>`).join('') :
+            '<li style="margin: 8px 0; color: #d32f2f;">Zone configuration is incomplete or invalid</li>';
+
+        modal.innerHTML = `
+            <div style="background: var(--card-background-color, #fff); border-radius: 12px; padding: 24px; max-width: 500px; margin: 20px;">
+                <h3 style="margin: 0 0 16px 0; color: var(--primary-text-color);">🔧 Troubleshoot ${zone.displayName}</h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <strong style="color: var(--error-color, #d32f2f);">Issues Found:</strong>
+                    <ul style="margin: 8px 0 0 16px; padding: 0;">
+                        ${errorList}
+                    </ul>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <strong style="color: var(--primary-text-color);">Troubleshooting Steps:</strong>
+                    <ol style="margin: 8px 0 0 16px; padding: 0; color: var(--secondary-text-color);">
+                        <li style="margin: 8px 0;">Check that camera entity exists and is accessible</li>
+                        <li style="margin: 8px 0;">Verify todo list entity (if configured) is working</li>
+                        <li style="margin: 8px 0;">Ensure zone purpose is clearly defined</li>
+                        <li style="margin: 8px 0;">Check addon logs for detailed error messages</li>
+                        <li style="margin: 8px 0;">Restart the AICleaner addon after making changes</li>
+                    </ol>
+                    
+                    <strong style="color: var(--primary-text-color); margin-top: 16px; display: block;">Common Pitfalls:</strong>
+                    <ul style="margin: 8px 0 0 16px; padding: 0; color: var(--secondary-text-color);">
+                        <li style="margin: 6px 0;">Ensure your AI provider API key is correctly entered and has necessary permissions</li>
+                        <li style="margin: 6px 0;">Verify Home Assistant has network access to the AI provider's API</li>
+                        <li style="margin: 6px 0;">Check for rate limiting or quota issues with your AI provider</li>
+                        <li style="margin: 6px 0;">Confirm AICleaner integration is properly loaded in Home Assistant</li>
+                        <li style="margin: 6px 0;">Review Home Assistant logs for backend errors</li>
+                        <li style="margin: 6px 0;">Verify YAML configuration syntax is correct (no indentation errors)</li>
+                    </ul>
+                </div>
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="modal-button secondary" onclick="this.closest('[style*=\"position: fixed\"]').remove()" aria-label="Close troubleshooting dialog">
+                        Close
+                    </button>
+                    <button class="modal-button primary" onclick="this.closest('[style*=\"position: fixed\"]').remove(); alert('To view logs:\\n\\n1. Go to HA Settings → Add-ons\\n2. Find AICleaner addon\\n3. Click on Logs tab');" aria-label="View addon logs for debugging">
+                        View Logs
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add styles for modal buttons
+        const modalStyle = document.createElement('style');
+        modalStyle.textContent = `
+            .modal-button {
+                padding: 8px 16px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+            .modal-button.primary {
+                background: var(--primary-color, #03a9f4);
+                color: white;
+            }
+            .modal-button.primary:hover {
+                background: var(--primary-color-dark, #0288d1);
+            }
+            .modal-button.secondary {
+                background: var(--secondary-background-color);
+                color: var(--primary-text-color);
+            }
+            .modal-button.secondary:hover {
+                background: var(--divider-color);
+            }
+        `;
+        document.head.appendChild(modalStyle);
+        
+        document.body.appendChild(modal);
+        
+        // Remove on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
     }
 }
 

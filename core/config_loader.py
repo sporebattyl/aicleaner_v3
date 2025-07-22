@@ -87,9 +87,23 @@ class ConfigurationLoader(Reloadable):
             return {}
         except yaml.YAMLError as e:
             logger.error(f"YAML parsing error in {file_path}: {e}")
+            # Provide more specific YAML error information
+            if hasattr(e, 'problem_mark') and e.problem_mark:
+                mark = e.problem_mark
+                error_line = mark.line + 1
+                error_column = mark.column + 1
+                logger.error(f"YAML syntax error in '{file_path}' at line {error_line}, column {error_column}")
+                raise ValueError(f"Invalid YAML syntax in '{file_path}' at line {error_line}, column {error_column}: {e}")
+            else:
+                raise ValueError(f"Invalid YAML content in '{file_path}': {e}")
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {file_path}")
+            raise
+        except PermissionError as e:
+            logger.error(f"Permission denied reading configuration: {file_path}")
             raise
         except Exception as e:
-            logger.error(f"Error reading {file_path}: {e}")
+            logger.error(f"Unexpected error reading configuration {file_path}: {e}", exc_info=True)
             raise
     
     def _deep_merge(self, base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:

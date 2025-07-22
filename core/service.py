@@ -6,6 +6,7 @@ import secrets
 import time
 import logging
 import asyncio
+import yaml
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -264,7 +265,7 @@ async def get_api_key_or_allow_local(
     if not configured_api_key or not validate_api_key(configured_api_key):
         logger.warning("API key authentication is enabled, but the configured key is missing or invalid (must be at least 32 characters).")
         # Block requests until a valid key is configured
-        raise HTTPException(status_code=503, detail="Service unavailable due to security misconfiguration.")
+        raise HTTPException(status_code=401, detail="API key authentication is enabled, but the configured API key is missing or invalid. Please configure a valid API key in the service settings, typically found in the 'aicleaner_v3' integration configuration within Home Assistant.")
     
     # Securely compare the provided key with the configured key
     if not x_api_key or not secrets.compare_digest(x_api_key, configured_api_key):
@@ -343,9 +344,17 @@ async def generate_text(request: GenerateRequest):
             response_time_ms=response.response_time_ms
         )
         
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except (ValueError, TypeError) as e:
+        logger.error(f"Invalid generation parameters: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid parameters: {str(e)}")
+    except TimeoutError as e:
+        logger.error(f"Generation request timed out: {e}")
+        raise HTTPException(status_code=504, detail="Request timed out")
     except Exception as e:
-        logger.error(f"Generation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected generation failure: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during text generation")
 
 
 @app.get("/v1/status", response_model=StatusResponse)
@@ -568,9 +577,23 @@ async def update_configuration(request: ConfigRequest):
                 detail=f"Configuration reload failed: {'; '.join(reload_context.errors)}"
             )
         
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except FileNotFoundError as e:
+        logger.error(f"Configuration file not found: {e}")
+        raise HTTPException(status_code=500, detail="Configuration file not accessible")
+    except PermissionError as e:
+        logger.error(f"Permission denied accessing configuration: {e}")
+        raise HTTPException(status_code=500, detail="Permission denied accessing configuration")
+    except yaml.YAMLError as e:
+        logger.error(f"YAML parsing error in configuration: {e}")
+        raise HTTPException(status_code=400, detail="Invalid YAML format in configuration")
+    except (ValueError, TypeError) as e:
+        logger.error(f"Invalid configuration values: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid configuration: {str(e)}")
     except Exception as e:
-        logger.error(f"Configuration update failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected configuration update failure: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during configuration update")
 
 
 @app.get("/v1/config/reload/status")

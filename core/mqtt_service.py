@@ -40,12 +40,22 @@ class MQTTService:
         if rc == 0:
             logger.info("Connected to MQTT Broker!")
             self._is_connected = True
-            # Start the publisher task only after successful connection
-            if self._publisher_task is None or self._publisher_task.done():
-                self._publisher_task = asyncio.create_task(self._message_publisher())
+            # Stop any existing publisher task and start a new one
+            self._stop_and_start_publisher_task()
         else:
             logger.error(f"Failed to connect to MQTT, return code {rc}: {MQTTErrorCode(rc).getName()}")
             self._is_connected = False
+
+    def _stop_and_start_publisher_task(self):
+        """Safely stops existing task and starts a new publisher task (non-async)."""
+        # Cancel existing task if running
+        if self._publisher_task and not self._publisher_task.done():
+            logger.debug("Cancelling existing MQTT publisher task...")
+            self._publisher_task.cancel()
+        
+        # Start new publisher task
+        self._publisher_task = asyncio.create_task(self._message_publisher())
+        logger.debug("Started new MQTT publisher task")
 
     def _on_disconnect(self, client, userdata, rc, properties=None):
         logger.warning(f"Disconnected from MQTT Broker with code: {rc}")
@@ -84,19 +94,40 @@ class MQTTService:
                 await asyncio.sleep(1)
             logger.warning("MQTT connection timed out.")
 
-        except Exception as e:
-            logger.error(f"Error connecting to MQTT broker: {e}")
+        except ConnectionRefusedError as e:
+            logger.error(f"MQTT broker connection refused: Broker actively refused connection. Is it running? {e}")
             self._is_connected = False
+        except TimeoutError as e:
+            logger.error(f"MQTT connection timeout: Could not connect within timeout period. {e}")
+            self._is_connected = False  
+        except OSError as e:
+            logger.error(f"MQTT network error: Could not reach broker. Check network connectivity. {e}")
+            self._is_connected = False
+        except ValueError as e:
+            logger.error(f"MQTT configuration error: Invalid broker settings. {e}")
+            self._is_connected = False
+        except Exception as e:
+            logger.error(f"Unexpected MQTT connection error: {e}", exc_info=True)
+            self._is_connected = False
+
+    async def _stop_publisher_task(self):
+        """Safely stops the publisher task if it's running."""
+        if self._publisher_task and not self._publisher_task.done():
+            logger.debug("Stopping existing MQTT publisher task...")
+            self._publisher_task.cancel()
+            try:
+                await self._publisher_task
+            except asyncio.CancelledError:
+                logger.debug("MQTT publisher task cancelled successfully")
+            except Exception as e:
+                logger.error(f"Error stopping MQTT publisher task: {e}")
+            finally:
+                self._publisher_task = None
 
     async def disconnect(self):
         """Disconnects from the MQTT broker."""
         if self._client:
-            if self._publisher_task and not self._publisher_task.done():
-                self._publisher_task.cancel()
-                try:
-                    await self._publisher_task  # Wait for it to finish cancelling
-                except asyncio.CancelledError:
-                    pass
+            await self._stop_publisher_task()
             self._client.loop_stop()
             self._client.disconnect()
             self._is_connected = False

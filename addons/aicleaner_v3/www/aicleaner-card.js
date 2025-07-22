@@ -1,3 +1,68 @@
+/**
+ * DebugManager for conditional console logging in production
+ * Supports multiple debug sources: localhost, URL params, localStorage, and HA entity
+ */
+class DebugManager {
+  constructor(options = {}) {
+    this.hassCheckInterval = options.hassCheckInterval || 5000;
+    this.baseCheckInterval = options.baseCheckInterval || 30000;
+    this.debugEnabled = this.calculateDebugState();
+    this.lastHassCheck = 0;
+    this.lastBaseCheck = 0;
+  }
+  
+  calculateDebugState() {
+    return (window.location.hostname === 'localhost' || 
+            window.location.search.includes('debug=true') ||
+            localStorage.getItem('aicleaner_debug') === 'true');
+  }
+  
+  updateDebugState(hass) {
+    const now = Date.now();
+    
+    // Periodically re-check base debug state (localStorage, URL params)
+    if (now - this.lastBaseCheck > this.baseCheckInterval) {
+      const baseState = this.calculateDebugState();
+      if (baseState !== this.debugEnabled) {
+        this.debugEnabled = baseState;
+        this.log('info', `Debug mode ${baseState ? 'enabled' : 'disabled'} via base detection`);
+      }
+      this.lastBaseCheck = now;
+    }
+    
+    // Check HA entity state (with error handling)
+    if (hass && (now - this.lastHassCheck > this.hassCheckInterval)) {
+      try {
+        const debugEntity = hass.states?.['input_boolean.aicleaner_debug_mode'];
+        if (debugEntity && debugEntity.state) {
+          const hassDebugState = debugEntity.state === 'on';
+          if (hassDebugState !== this.debugEnabled) {
+            this.debugEnabled = hassDebugState;
+            this.log('info', `Debug mode ${hassDebugState ? 'enabled' : 'disabled'} via HA entity`);
+          }
+        }
+      } catch (error) {
+        // Silently handle HA state access errors
+        this.log('warn', 'Failed to check HA debug entity:', error.message);
+      }
+      this.lastHassCheck = now;
+    }
+  }
+  
+  log(level, ...args) {
+    // Always show errors and warnings, only show info/debug when enabled
+    if (this.debugEnabled || ['warn', 'error'].includes(level)) {
+      console[level]('[AICleaner]', ...args);
+    }
+  }
+}
+
+// Initialize debug manager singleton
+const debugManager = new DebugManager({
+  hassCheckInterval: 5000,    // Check HA every 5s
+  baseCheckInterval: 30000    // Check localStorage/URL every 30s
+});
+
 class AICleanerCard extends HTMLElement {
   constructor() {
     super();
@@ -6,6 +71,7 @@ class AICleanerCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    debugManager.updateDebugState(hass);
     
     if (!this.content) {
       this.content = document.createElement('div');
@@ -23,6 +89,34 @@ class AICleanerCard extends HTMLElement {
           border-radius: 8px;
           background-color: var(--card-background-color, #fff);
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          position: relative;
+        }
+        .zone.error {
+          border: 2px solid var(--error-color, #f44336);
+          background-color: rgba(244, 67, 54, 0.1);
+        }
+        .error-message {
+          color: var(--error-color, #f44336);
+          font-weight: bold;
+          margin-top: 8px;
+          margin-bottom: 12px;
+          padding: 8px;
+          background-color: rgba(244, 67, 54, 0.15);
+          border-radius: 4px;
+        }
+        .troubleshoot-button {
+          background-color: var(--warning-color, #ff9800);
+          margin-left: 8px;
+        }
+        .troubleshoot-button:hover {
+          background-color: #e68900;
+        }
+        .error-icon {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          color: var(--error-color, #f44336);
+          font-size: 20px;
         }
         .zone-header {
           display: flex;
@@ -186,7 +280,7 @@ class AICleanerCard extends HTMLElement {
   initializeCharts() {
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
-      console.warn('Chart.js not loaded. Analytics charts will not be available.');
+      debugManager.log('warn', 'Chart.js not loaded. Analytics charts will not be available.');
       // Display fallback message
       const analyticsContainer = this.shadowRoot.querySelector('.analytics-view');
       if (analyticsContainer) {
