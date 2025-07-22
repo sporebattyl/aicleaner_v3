@@ -238,20 +238,6 @@ def validate_api_key(key: str) -> bool:
     return len(key) >= 32
 
 
-def _deep_merge_config(source: Dict, destination: Dict) -> Dict:
-    """
-    Recursively merges two dictionaries.
-    'source' is merged into 'destination'.
-    """
-    for key, value in source.items():
-        if isinstance(value, dict):
-            # Get node or create one
-            node = destination.setdefault(key, {})
-            _deep_merge_config(value, node)
-        else:
-            destination[key] = value
-    return destination
-
 
 # --- Authentication Dependency ---
 async def get_api_key_or_allow_local(
@@ -558,7 +544,10 @@ async def update_configuration(request: ConfigRequest):
             update_data['performance'] = request.performance
         
         # Deep merge the update into the current configuration
-        updated_config = _deep_merge_config(update_data, current_user_config)
+        if config_loader_instance is None:
+            raise HTTPException(status_code=500, detail="Configuration loader not initialized")
+        # Use the ConfigurationLoader's deep merge, which handles list replacement correctly
+        updated_config = config_loader_instance._deep_merge(current_user_config, update_data)
 
         # Write updated configuration to user config file
         async with aiofiles.open(user_config_file, 'w') as f:
@@ -771,7 +760,10 @@ async def switch_provider(request: Dict[str, str]):
         
         # Deep merge the provider switch into the current configuration
         update_data = {'general': {'active_provider': provider_name}}
-        updated_config = _deep_merge_config(update_data, current_user_config)
+        if config_loader_instance is None:
+            raise HTTPException(status_code=500, detail="Configuration loader not initialized")
+        # Use the ConfigurationLoader's deep merge, which handles list replacement correctly
+        updated_config = config_loader_instance._deep_merge(current_user_config, update_data)
         
         # Write updated configuration to user config file
         async with aiofiles.open(user_config_file, 'w') as f:

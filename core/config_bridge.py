@@ -120,5 +120,39 @@ class ConfigBridge:
                         current_level[p_key] = {}
                     current_level = current_level[p_key]
 
+        # Special handling for 'zones' array  
+        if 'zones' in options_data:
+            zones_list = options_data['zones']
+            if isinstance(zones_list, list):
+                # Ensure ai_cleaner.zones exists
+                transformed_config.setdefault('ai_cleaner', {}).setdefault('zones', {})
+                
+                for zone_data in zones_list:
+                    if isinstance(zone_data, dict):
+                        zone_name = zone_data.get('name')
+                        if zone_name:
+                            try:
+                                processed_zone = {
+                                    'name': zone_name,
+                                    'camera_entity': zone_data.get('camera_entity', ''),
+                                    'todo_list_entity': zone_data.get('todo_list_entity', ''),
+                                    'purpose': zone_data.get('purpose', ''),
+                                    'interval_minutes': int(zone_data.get('interval_minutes', 0)),
+                                    'specific_times': zone_data.get('specific_times', []),
+                                    'random_offset_minutes': int(zone_data.get('random_offset_minutes', 0)),
+                                    'ignore_rules': zone_data.get('ignore_rules', [])
+                                }
+                                if zone_name in transformed_config['ai_cleaner']['zones']:
+                                    logger.warning(f"Duplicate zone name '{zone_name}' found in options.json. Overwriting existing zone.")
+                                transformed_config['ai_cleaner']['zones'][zone_name] = processed_zone
+                                logger.debug(f"Processed zone '{zone_name}' from options.json")
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Failed to process zone '{zone_name}': {e}. Skipping this zone.")
+                        else:
+                            logger.warning(f"Zone missing 'name' field in options.json: {zone_data}. Skipping.")
+                logger.info(f"Processed {len(transformed_config.get('ai_cleaner', {}).get('zones', {}))} zones from options.json")
+            else:
+                logger.warning(f"Expected 'zones' to be a list but got {type(zones_list)}. Skipping zones processing.")
+
         logger.debug(f"Transformed config from options.json: {transformed_config}")
         return transformed_config
