@@ -23,18 +23,70 @@ map:
   - ssl:ro
 ports: {}
 options:
+  # General settings
+  active_provider: "ollama"
   log_level: "info"
-  primary_api_key: ""
-  backup_api_keys: []
+  
+  # AI Provider API Keys
+  api_key_openai: ""
+  api_key_gemini: ""
+  ollama_base_url: "http://localhost:11434"
+  ollama_default_model: "llama2"
+  
+  # MQTT Broker settings
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  mqtt_client_id: "aicleaner_v3"
+  mqtt_discovery_enabled: true
   mqtt_discovery_prefix: "homeassistant"
-  device_id: "aicleaner_v3"
+  
+  # Service API settings
+  api_port: 8099
+  api_key_enabled: false
+  api_key: ""
+  
+  # Performance settings
+  cache_enabled: true
+  metrics_retention_days: 7
+  
+  # Security settings
+  key_rotation_enabled: true
+  default_rotation_days: 30
+
 schema:
+  # General settings
+  active_provider: "list(openai|anthropic|gemini|ollama)"
   log_level: "list(trace|debug|info|notice|warning|error|fatal)"
-  primary_api_key: "password"
-  backup_api_keys:
-    - "password"
+  
+  # AI Provider API Keys
+  api_key_openai: "password"
+  api_key_gemini: "password"
+  ollama_base_url: "url"
+  ollama_default_model: "str"
+  
+  # MQTT Broker settings
+  mqtt_host: "str"
+  mqtt_port: "port"
+  mqtt_username: "str?"
+  mqtt_password: "password?"
+  mqtt_client_id: "str"
+  mqtt_discovery_enabled: "bool"
   mqtt_discovery_prefix: "str"
-  device_id: "str"
+  
+  # Service API settings
+  api_port: "port"
+  api_key_enabled: "bool"
+  api_key: "password?"
+  
+  # Performance settings
+  cache_enabled: "bool"
+  metrics_retention_days: "int"
+  
+  # Security settings
+  key_rotation_enabled: "bool"
+  default_rotation_days: "int"
 services:
   - "mqtt:want"
 image: "ghcr.io/drewcifer/aicleaner_v3/{arch}"

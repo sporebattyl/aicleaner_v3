@@ -91,11 +91,11 @@ class SecurityManager:
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
         
-        # Security paths
-        self.security_dir = config_path / "aicleaner" / "security"
-        self.keys_dir = self.security_dir / "keys"
-        self.secrets_file = self.security_dir / "secrets.yaml"
-        self.events_file = self.security_dir / "security_events.json"
+        # Security paths for container environment
+        self.security_dir = Path("/data/security")  # Container path for persistent security data
+        self.keys_dir = self.security_dir / "keys"  # Keys stored within /data/security
+        self.secrets_file = Path("/config/secrets.yaml")  # HA secrets.yaml for external secrets
+        self.events_file = self.security_dir / "security_events.json"  # Security events log
         
         # Security state
         self.active_keys: Dict[str, SecurityKey] = {}
@@ -390,7 +390,7 @@ class SecurityManager:
         
         try:
             # Look for secrets.yaml in HA config
-            ha_secrets_file = self.config_path.parent / "secrets.yaml"
+            ha_secrets_file = Path("/config/secrets.yaml")
             
             if not ha_secrets_file.exists():
                 self.logger.info("No Home Assistant secrets.yaml found")

@@ -93,9 +93,9 @@ class BackupManager:
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
         
-        # Backup paths
-        self.backup_root = config_path / "aicleaner" / "backups"
-        self.temp_dir = config_path / "aicleaner" / "temp"
+        # Backup paths for container environment
+        self.backup_root = Path("/data/backups")  # Container path for backups
+        self.temp_dir = Path("/tmp/aicleaner_temp_backups")  # Use /tmp for temporary files
         
         # Configuration
         self.max_backups = self.config.get("max_backups", 10)
@@ -386,12 +386,12 @@ class BackupManager:
             config_dir.mkdir(exist_ok=True)
             
             # Service configuration
-            service_config_source = self.config_path / "aicleaner" / "service_config.yaml"
+            service_config_source = Path("/config/service_config.yaml")  # Service config in /config
             if service_config_source.exists():
                 shutil.copy2(service_config_source, config_dir / "service_config.yaml")
             
             # Installation record
-            install_record_source = self.config_path / "aicleaner" / "installation.json"
+            install_record_source = Path("/data/installation.json")  # Installation record in /data
             if install_record_source.exists():
                 shutil.copy2(install_record_source, config_dir / "installation.json")
             
@@ -408,12 +408,12 @@ class BackupManager:
             security_dir.mkdir(exist_ok=True)
             
             # Security configuration (safe to backup)
-            security_config_source = self.config_path / "aicleaner" / "security" / "security_config.yaml"
+            security_config_source = Path("/data/security/security_config.yaml")  # Security config in /data/security
             if security_config_source.exists():
                 shutil.copy2(security_config_source, security_dir / "security_config.yaml")
             
             # External secrets (encrypted in original system)
-            secrets_source = self.config_path / "aicleaner" / "security" / "secrets.yaml"
+            secrets_source = Path("/config/secrets.yaml")  # HA secrets.yaml
             if secrets_source.exists():
                 shutil.copy2(secrets_source, security_dir / "secrets.yaml")
             
@@ -440,7 +440,7 @@ class BackupManager:
             ]
             
             for source_name in perf_sources:
-                source_path = self.config_path / "aicleaner" / "performance" / source_name
+                source_path = Path(f"/data/performance/{source_name}")  # Performance data in /data/performance
                 if source_path.exists():
                     shutil.copy2(source_path, perf_dir / source_name)
             
@@ -464,7 +464,7 @@ class BackupManager:
             ]
             
             for source_name in system_sources:
-                source_path = self.config_path / "aicleaner" / "system" / source_name
+                source_path = Path(f"/data/system/{source_name}")  # System state in /data/system
                 if source_path.exists():
                     shutil.copy2(source_path, system_dir / source_name)
             
@@ -488,7 +488,7 @@ class BackupManager:
             ]
             
             for source_name in metrics_sources:
-                source_path = self.config_path / "aicleaner" / "metrics" / source_name
+                source_path = Path(f"/data/metrics/{source_name}")  # Metrics history in /data/metrics
                 if source_path.exists():
                     shutil.copy2(source_path, metrics_dir / source_name)
             
@@ -505,7 +505,7 @@ class BackupManager:
             providers_dir.mkdir(exist_ok=True)
             
             # Provider configuration files
-            provider_config_source = self.config_path / "aicleaner" / "providers"
+            provider_config_source = Path("/data/providers")  # Provider configs in /data/providers
             if provider_config_source.exists():
                 for config_file in provider_config_source.glob("*.yaml"):
                     shutil.copy2(config_file, providers_dir / config_file.name)
@@ -775,8 +775,8 @@ class BackupManager:
     
     async def _get_ha_version(self) -> str:
         """Get Home Assistant version"""
-        # This is a simplified implementation
-        version_file = self.config_path / ".HA_VERSION"
+        # HA version file is in /config
+        version_file = Path("/config/.HA_VERSION")
         if version_file.exists():
             return version_file.read_text().strip()
         return "unknown"

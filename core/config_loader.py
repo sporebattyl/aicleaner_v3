@@ -21,7 +21,7 @@ class ConfigurationLoader(Reloadable):
     Supports environment variable substitution.
     """
     
-    def __init__(self, config_dir: str = "/home/drewcifer/aicleaner_v3/core", service_registry: Optional[ServiceRegistry] = None):
+    def __init__(self, config_dir: str = "/config", service_registry: Optional[ServiceRegistry] = None):
         self.config_dir = Path(config_dir)
         self.default_config_file = self.config_dir / "config.default.yaml"
         self.user_config_file = self.config_dir / "config.user.yaml"

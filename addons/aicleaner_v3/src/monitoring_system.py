@@ -100,7 +100,7 @@ class ConfigurableMonitor:
     """
     
     def __init__(self, config_path: Path, config: Dict[str, Any] = None):
-        self.config_path = config_path
+        self.config_path = Path("/data")  # Data directory for persistent storage
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
         
@@ -793,7 +793,7 @@ class ConfigurableMonitor:
     
     async def _load_monitoring_config(self) -> None:
         """Load monitoring configuration from file"""
-        config_file = self.config_path / "aicleaner" / "monitoring_config.yaml"
+        config_file = Path("/config/monitoring_config.yaml")  # Monitoring config in /config
         
         if config_file.exists():
             try:

@@ -8,13 +8,16 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .config_loader import config_loader
+from .config_loader import ConfigurationLoader  # Import the class directly
+from .config_bridge import ConfigBridge  # Import the new ConfigBridge
+from .mqtt_service import MQTTService  # Import MQTT service
 from .ai_provider import AIService
 from .metrics_manager import MetricsManager
 from .service_registry import ServiceRegistry, ReloadContext
@@ -25,8 +28,10 @@ logger = logging.getLogger(__name__)
 
 # Global instances
 ai_service: Optional[AIService] = None
+mqtt_service: Optional[MQTTService] = None  # New: MQTT Service instance
 metrics_manager: Optional[MetricsManager] = None
 service_registry: Optional[ServiceRegistry] = None
+config_loader_instance: Optional[ConfigurationLoader] = None  # Instance reference
 service_metrics = {
     'start_time': time.time(),
     'total_requests': 0,
@@ -43,37 +48,56 @@ service_metrics = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global ai_service, metrics_manager, service_registry
+    global ai_service, metrics_manager, service_registry, mqtt_service, config_loader_instance
     
     # Startup
     logger.info("Starting AICleaner v3 Core Service")
     
     try:
-        # Load configuration and validate
-        config = config_loader.load_configuration()
-        is_valid, errors = config_loader.validate_configuration()
-        
+        # Initialize ConfigLoader with the container's config directory
+        # This will load config.default.yaml and config.user.yaml from /config/
+        config_loader_instance = ConfigurationLoader(config_dir="/config")
+
+        # Initialize ConfigBridge to load options.json from /data/
+        config_bridge = ConfigBridge(options_file_path=Path("/data/options.json"))
+        addon_options_config = config_bridge.load_addon_options()
+
+        # Initialize Service Registry
+        service_registry = ServiceRegistry()
+
+        # Set service registry in config loader
+        config_loader_instance.set_service_registry(service_registry)
+
+        # Load initial configuration, merging with addon options
+        # This will trigger a reload through the service registry
+        reload_context = await config_loader_instance.reload_configuration(new_config_data=addon_options_config)
+        if reload_context.status != "completed":
+            logger.error(f"Initial configuration load failed: {reload_context.errors}")
+            raise ValueError(f"Initial configuration load failed: {'; '.join(reload_context.errors)}")
+
+        config = config_loader_instance.load_configuration()  # Get the now-loaded config
+        is_valid, errors = config_loader_instance.validate_configuration()
         if not is_valid:
             logger.error(f"Configuration validation failed: {errors}")
             raise ValueError(f"Invalid configuration: {'; '.join(errors)}")
         
-        # Initialize Service Registry
-        service_registry = ServiceRegistry()
-        
-        # Set service registry in config loader
-        config_loader.set_service_registry(service_registry)
-        
         # Initialize AI service
-        ai_service = AIService(config_loader)
+        ai_service = AIService(config_loader_instance)
         
         # Initialize Metrics Manager
         metrics_manager = MetricsManager(config)
         await metrics_manager.start_background_task()
-        
+
+        # Initialize MQTT Service
+        mqtt_config = config_loader_instance.get_mqtt_config()
+        mqtt_service = MQTTService(mqtt_config)
+        await mqtt_service.connect()
+
         # Register services with the registry
-        service_registry.register_service("config_loader", config_loader)
+        service_registry.register_service("config_loader", config_loader_instance)
         service_registry.register_service("ai_service", ai_service, dependencies=["config_loader"])
-        # Note: metrics_manager doesn't implement Reloadable yet, could be added later
+        service_registry.register_service("mqtt_service", mqtt_service, dependencies=["config_loader"])
+        # metrics_manager doesn't implement Reloadable yet, could be added later
         
         logger.info("Core service initialized successfully")
         
@@ -84,6 +108,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    if mqtt_service:
+        await mqtt_service.disconnect()
     if metrics_manager:
         await metrics_manager.stop_background_task()
     
@@ -236,7 +262,7 @@ async def get_api_key_or_allow_local(
     FastAPI dependency to enforce API key authentication for non-local requests,
     or allow all requests if API key authentication is disabled.
     """
-    config = config_loader.get_service_config()
+    config = config_loader_instance.get_service_config() if config_loader_instance else {}
     api_config = config.get('api', {})
     api_key_enabled = api_config.get('api_key_enabled', False)
     configured_api_key = api_config.get('api_key')
@@ -348,12 +374,12 @@ async def get_status():
         # Get provider status
         providers = await ai_service.get_provider_status()
         
-        # Get MQTT status (placeholder - would integrate with actual MQTT service)
-        mqtt_config = config_loader.get_mqtt_config()
+        # Get MQTT status
+        mqtt_config = config_loader_instance.get_mqtt_config() if config_loader_instance else {}
         mqtt_status = {
-            'connected': False,  # Would check actual connection
+            'connected': mqtt_service.is_connected() if mqtt_service else False,  # Check actual connection
             'broker': f"{mqtt_config.get('broker', {}).get('host', 'localhost')}:{mqtt_config.get('broker', {}).get('port', 1883)}",
-            'discovered_devices': 0  # Would count actual devices
+            'discovered_devices': len(mqtt_service.get_discovered_devices()) if mqtt_service else 0  # Count actual devices
         }
         
         # Calculate uptime
@@ -412,8 +438,8 @@ async def get_metrics():
 async def get_mqtt_devices():
     """Returns discovered and explicitly configured MQTT devices."""
     try:
-        # Get MQTT configuration
-        mqtt_config = config_loader.get_mqtt_config()
+        # Get MQTT configuration from the instance
+        mqtt_config = config_loader_instance.get_mqtt_config() if config_loader_instance else {}
         explicit_devices = mqtt_config.get('devices', [])
         
         # Convert explicit devices to MqttDevice format
@@ -431,8 +457,11 @@ async def get_mqtt_devices():
             )
             explicit_mqtt_devices.append(mqtt_device)
         
-        # Discovered devices (placeholder - would implement auto-discovery)
-        discovered_devices = []
+        # Discovered devices
+        discovered_devices = []  # This will be populated by monitoring_system via MQTT discovery
+        if mqtt_service:
+            # Get discovered devices from MQTT service
+            discovered_devices.extend(mqtt_service.get_discovered_devices())
         
         return MqttDevicesResponse(
             discovered=discovered_devices,
@@ -449,7 +478,7 @@ async def get_mqtt_devices():
 async def get_configuration():
     """Retrieves current service configuration with redacted secrets."""
     try:
-        config = config_loader.load_configuration()
+        config = config_loader_instance.load_configuration() if config_loader_instance else {}
         
         # Build provider info with redacted secrets
         providers = {}
@@ -537,7 +566,7 @@ async def update_configuration(request: ConfigRequest):
             await f.write(config_content)
         
         # Initiate hot-reload using the new system
-        reload_context = await config_loader.reload_configuration()
+        reload_context = await config_loader_instance.reload_configuration()
         
         if reload_context.status == "completed":
             logger.info(f"Configuration hot-reload completed successfully (version {reload_context.version})")
@@ -576,13 +605,13 @@ async def get_reload_status():
                     "errors": reload_context.errors,
                     "start_time": reload_context.start_time
                 },
-                "config_version": config_loader.get_config_version()
+                "config_version": config_loader_instance.get_config_version() if config_loader_instance else 0
             }
         else:
             return {
                 "reload_in_progress": is_reload_in_progress,
                 "current_context": None,
-                "config_version": config_loader.get_config_version()
+                "config_version": config_loader_instance.get_config_version() if config_loader_instance else 0
             }
     
     except Exception as e:
@@ -602,7 +631,7 @@ async def trigger_config_reload():
         logger.info("Manual configuration reload triggered")
         
         # Trigger reload from files (no new config data provided)
-        reload_context = await config_loader.reload_configuration()
+        reload_context = await config_loader_instance.reload_configuration()
         
         return {
             "status": "success" if reload_context.status == "completed" else "failed",
@@ -705,7 +734,7 @@ async def switch_provider(request: Dict[str, str]):
     
     try:
         # Validate provider exists and is available
-        config = config_loader.load_configuration()
+        config = config_loader_instance.load_configuration() if config_loader_instance else {}
         ai_providers = config.get('ai_providers', {})
         
         if provider_name not in ai_providers:
@@ -751,11 +780,11 @@ async def switch_provider(request: Dict[str, str]):
         
         # Trigger hot-reload to apply the change
         if service_registry:
-            reload_context = await config_loader.reload_configuration()
+            reload_context = await config_loader_instance.reload_configuration()
             if reload_context.success:
                 # Update ai_service with new active provider
-                new_config = config_loader.load_configuration()
-                ai_service.config_loader = config_loader
+                new_config = config_loader_instance.load_configuration()
+                ai_service.config_loader = config_loader_instance
                 logger.info(f"Successfully switched to provider: {provider_name}")
             else:
                 logger.error(f"Hot-reload failed after provider switch: {reload_context.errors}")
@@ -879,7 +908,7 @@ if __name__ == "__main__":
     import uvicorn
     
     # Get service configuration
-    service_config = config_loader.get_service_config()
+    service_config = config_loader_instance.get_service_config() if config_loader_instance else {}
     api_config = service_config.get('api', {})
     
     host = api_config.get('host', '0.0.0.0')
