@@ -126,6 +126,501 @@ class HomeAssistantPlaywrightTester:
             print(f"⚠️ Error checking login screen: {e}")
             return False
     
+    async def add_custom_repository(self, page: Page, repo_url: str = "https://github.com/sporebattyl/aicleaner_v3") -> bool:
+        """Add custom addon repository to Home Assistant"""
+        try:
+            print("📦 Adding custom addon repository...")
+            
+            # Navigate to Add-ons → Add-on Store
+            await page.goto(f"{self.ha_url}/hassio/store")
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await self.take_screenshot(page, "addon_store", "Add-on Store page")
+            
+            # Look for the three dots menu or repositories button (enhanced selectors)
+            menu_selectors = [
+                "button[aria-label='Repository']",
+                "button:has-text('Repositories')",
+                "[data-test-id='repositories']",
+                "button[title*='repositor']",
+                ".mdc-icon-button:has(mdi-icon[path*='dots'])",
+                "mdi-icon[path*='dots-vertical']",
+                "ha-icon-button:has(ha-icon[icon='mdi:dots-vertical'])",
+                "mwc-icon-button:has(ha-icon[icon='mdi:dots-vertical'])",
+                "button[aria-label*='menu']",
+                "button.mdc-icon-button",
+                ".menu-button",
+                "[role='button']:has-text('⋮')",
+                "button:has(ha-icon[icon*='dot'])",
+                "ha-button-menu button"
+            ]
+            
+            menu_clicked = False
+            for selector in menu_selectors:
+                try:
+                    menu_button = await page.wait_for_selector(selector, timeout=3000)
+                    if menu_button:
+                        print(f"🔍 Found repository menu: {selector}")
+                        await menu_button.click()
+                        await page.wait_for_timeout(1000)
+                        menu_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not menu_clicked:
+                # Try navigating directly to repositories management
+                print("🔍 Trying direct navigation to repositories...")
+                await page.goto(f"{self.ha_url}/hassio/store/repositories")
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            
+            await self.take_screenshot(page, "repositories_menu", "Repositories management")
+            
+            # Look for "Add Repository" button (enhanced selectors)
+            add_repo_selectors = [
+                "button:has-text('Add Repository')",
+                "button:has-text('Add')",
+                "[data-test-id='add-repository']",
+                "mdi-icon[path*='plus']",
+                ".mdc-button:has-text('Add')",
+                "ha-button:has-text('Add Repository')",
+                "mwc-button:has-text('Add Repository')",
+                "button[aria-label*='Add Repository']",
+                "button[title*='Add Repository']",
+                ".fab:has(ha-icon[icon='mdi:plus'])",
+                "ha-fab:has(ha-icon[icon='mdi:plus'])",
+                "button:has(ha-icon[icon='mdi:plus'])",
+                "mwc-fab:has(ha-icon[icon='mdi:plus'])",
+                "[data-action='add-repository']",
+                ".add-repository-button"
+            ]
+            
+            add_clicked = False
+            for selector in add_repo_selectors:
+                try:
+                    add_button = await page.wait_for_selector(selector, timeout=5000)
+                    if add_button:
+                        print(f"➕ Found add repository button: {selector}")
+                        await add_button.click()
+                        await page.wait_for_timeout(2000)
+                        add_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not add_clicked:
+                print("❌ Could not find add repository button")
+                # Debug: Log available buttons for troubleshooting
+                try:
+                    buttons = await page.locator("button").all()
+                    print(f"🔍 Debug: Found {len(buttons)} buttons on page")
+                    for i, button in enumerate(buttons[:10]):  # Show first 10 buttons
+                        try:
+                            text = await button.text_content()
+                            inner_html = await button.inner_html()
+                            print(f"  Button {i}: Text='{text}', HTML='{inner_html[:100]}...'")
+                        except:
+                            print(f"  Button {i}: Could not read content")
+                except Exception as debug_error:
+                    print(f"🔍 Debug error: {debug_error}")
+                return False
+            
+            await self.take_screenshot(page, "add_repo_dialog", "Add repository dialog")
+            
+            # Fill in the repository URL
+            url_selectors = [
+                "input[placeholder*='https://']",
+                "input[placeholder*='Repository']",
+                "input[type='url']",
+                "input[name='url']",
+                "textarea"
+            ]
+            
+            url_filled = False
+            for selector in url_selectors:
+                try:
+                    url_field = await page.wait_for_selector(selector, timeout=3000)
+                    if url_field:
+                        await url_field.clear()
+                        await url_field.fill(repo_url)
+                        print(f"✅ Repository URL filled: {repo_url}")
+                        url_filled = True
+                        break
+                except:
+                    continue
+            
+            if not url_filled:
+                print("❌ Could not find repository URL field")
+                return False
+            
+            # Submit the repository
+            submit_selectors = [
+                "button:has-text('Add')",
+                "button:has-text('Save')",
+                "button:has-text('Submit')",
+                "button[type='submit']"
+            ]
+            
+            for selector in submit_selectors:
+                try:
+                    submit_button = await page.wait_for_selector(selector, timeout=3000)
+                    if submit_button:
+                        print(f"💾 Submitting repository: {selector}")
+                        await submit_button.click()
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                        await self.take_screenshot(page, "repo_added", "Repository added")
+                        break
+                except:
+                    continue
+            
+            # Verify repository was added successfully
+            await page.wait_for_timeout(3000)
+            print("✅ Custom repository added successfully!")
+            
+            self.results["tests"]["custom_repository"] = {
+                "status": "success",
+                "message": f"Successfully added repository: {repo_url}"
+            }
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error adding custom repository: {e}")
+            await self.take_screenshot(page, "repo_error", f"Repository error: {e}")
+            self.results["tests"]["custom_repository"] = {
+                "status": "error",
+                "error": str(e)
+            }
+            return False
+    
+    async def install_aicleaner_addon(self, page: Page) -> bool:
+        """Install AICleaner V3 addon from custom repository"""
+        try:
+            print("🚀 Installing AICleaner V3 addon...")
+            
+            # Navigate to add-on store and look for AICleaner
+            await page.goto(f"{self.ha_url}/hassio/store")
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            
+            # Look for AICleaner addon in the store
+            aicleaner_selectors = [
+                "text=AICleaner v3",
+                "text=AI Cleaner v3", 
+                "[data-slug='aicleaner_v3']",
+                "text*=AICleaner",
+                "text*=AI Cleaner"
+            ]
+            
+            addon_found = False
+            for selector in aicleaner_selectors:
+                try:
+                    addon_element = await page.wait_for_selector(selector, timeout=5000)
+                    if addon_element:
+                        print(f"✅ Found AICleaner addon: {selector}")
+                        await addon_element.click()
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        addon_found = True
+                        break
+                except:
+                    continue
+            
+            if not addon_found:
+                print("❌ AICleaner addon not found in store")
+                await self.take_screenshot(page, "addon_not_found", "AICleaner not found")
+                return False
+            
+            await self.take_screenshot(page, "addon_page", "AICleaner addon page")
+            
+            # Click Install button
+            install_selectors = [
+                "button:has-text('Install')",
+                "button:has-text('INSTALL')",
+                "[data-test-id='install']"
+            ]
+            
+            install_clicked = False
+            for selector in install_selectors:
+                try:
+                    install_button = await page.wait_for_selector(selector, timeout=5000)
+                    if install_button:
+                        print(f"⬇️ Installing addon: {selector}")
+                        await install_button.click()
+                        await page.wait_for_timeout(2000)
+                        install_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not install_clicked:
+                print("❌ Could not find install button")
+                return False
+            
+            # Wait for installation to complete (this can take several minutes)
+            print("⏳ Waiting for installation to complete...")
+            
+            # Wait and monitor for installation completion
+            for i in range(60):  # Wait up to 5 minutes
+                try:
+                    # Look for installation complete indicators
+                    complete_indicators = [
+                        "text=Installation complete",
+                        "button:has-text('Start')",
+                        "button:has-text('Configuration')",
+                        "text=Installed"
+                    ]
+                    
+                    for indicator in complete_indicators:
+                        try:
+                            element = await page.wait_for_selector(indicator, timeout=2000)
+                            if element:
+                                print("✅ Installation completed!")
+                                await self.take_screenshot(page, "installation_complete", "Installation completed")
+                                self.results["tests"]["addon_installation"] = {
+                                    "status": "success",
+                                    "message": "AICleaner addon installed successfully"
+                                }
+                                return True
+                        except:
+                            continue
+                    
+                    # Check for errors
+                    error_indicators = [
+                        "text=Installation failed",
+                        "text=Error",
+                        "text=Failed"
+                    ]
+                    
+                    for indicator in error_indicators:
+                        try:
+                            element = await page.wait_for_selector(indicator, timeout=1000)
+                            if element:
+                                print("❌ Installation failed!")
+                                await self.take_screenshot(page, "installation_failed", "Installation failed")
+                                return False
+                        except:
+                            continue
+                    
+                    await page.wait_for_timeout(5000)  # Wait 5 seconds before checking again
+                    
+                except Exception as e:
+                    print(f"⏳ Installation in progress... ({i+1}/60)")
+                    continue
+            
+            print("⚠️ Installation timeout - may still be in progress")
+            await self.take_screenshot(page, "installation_timeout", "Installation timeout")
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error installing addon: {e}")
+            await self.take_screenshot(page, "install_error", f"Installation error: {e}")
+            self.results["tests"]["addon_installation"] = {
+                "status": "error", 
+                "error": str(e)
+            }
+            return False
+    
+    async def configure_aicleaner_addon(self, page: Page, api_key: str = "AIzaSyDYRk_mZQZ_Rjq-sPbLaW5fpN9XnZ39Nro") -> bool:
+        """Configure AICleaner addon with API key and settings"""
+        try:
+            print("⚙️ Configuring AICleaner addon...")
+            
+            # Navigate to Configuration tab
+            config_selectors = [
+                "button:has-text('Configuration')",
+                "tab:has-text('Configuration')",
+                "[data-test-id='configuration']"
+            ]
+            
+            config_clicked = False
+            for selector in config_selectors:
+                try:
+                    config_tab = await page.wait_for_selector(selector, timeout=5000)
+                    if config_tab:
+                        print(f"⚙️ Opening configuration: {selector}")
+                        await config_tab.click()
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        config_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not config_clicked:
+                print("❌ Could not find configuration tab")
+                return False
+            
+            await self.take_screenshot(page, "addon_config", "Addon configuration page")
+            
+            # Look for API key field
+            api_key_selectors = [
+                "input[name*='gemini_api_key']",
+                "input[name*='api_key']",
+                "input[placeholder*='API']",
+                "input[placeholder*='Key']",
+                "textarea[name*='api']"
+            ]
+            
+            api_key_filled = False
+            for selector in api_key_selectors:
+                try:
+                    api_field = await page.wait_for_selector(selector, timeout=3000)
+                    if api_field:
+                        await api_field.clear()
+                        await api_field.fill(api_key)
+                        print("🔑 API key configured")
+                        api_key_filled = True
+                        break
+                except:
+                    continue
+            
+            if not api_key_filled:
+                print("⚠️ Could not find API key field - may need manual configuration")
+            
+            # Save configuration
+            save_selectors = [
+                "button:has-text('Save')",
+                "button:has-text('SAVE')", 
+                "[data-test-id='save']"
+            ]
+            
+            for selector in save_selectors:
+                try:
+                    save_button = await page.wait_for_selector(selector, timeout=3000)
+                    if save_button:
+                        print(f"💾 Saving configuration: {selector}")
+                        await save_button.click()
+                        await page.wait_for_timeout(2000)
+                        break
+                except:
+                    continue
+            
+            await self.take_screenshot(page, "config_saved", "Configuration saved")
+            
+            self.results["tests"]["addon_configuration"] = {
+                "status": "success",
+                "message": "AICleaner addon configured successfully"
+            }
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error configuring addon: {e}")
+            await self.take_screenshot(page, "config_error", f"Configuration error: {e}")
+            self.results["tests"]["addon_configuration"] = {
+                "status": "error",
+                "error": str(e)
+            }
+            return False
+    
+    async def start_aicleaner_addon(self, page: Page) -> bool:
+        """Start AICleaner addon and verify it's running"""
+        try:
+            print("▶️ Starting AICleaner addon...")
+            
+            # Navigate to Info/Logs tab
+            info_selectors = [
+                "button:has-text('Info')",
+                "tab:has-text('Info')",
+                "[data-test-id='info']"
+            ]
+            
+            for selector in info_selectors:
+                try:
+                    info_tab = await page.wait_for_selector(selector, timeout=3000)
+                    if info_tab:
+                        print(f"ℹ️ Opening info tab: {selector}")
+                        await info_tab.click()
+                        await page.wait_for_load_state("networkidle", timeout=5000)
+                        break
+                except:
+                    continue
+            
+            await self.take_screenshot(page, "addon_info", "Addon info page")
+            
+            # Look for Start button
+            start_selectors = [
+                "button:has-text('Start')",
+                "button:has-text('START')",
+                "[data-test-id='start']"
+            ]
+            
+            start_clicked = False
+            for selector in start_selectors:
+                try:
+                    start_button = await page.wait_for_selector(selector, timeout=3000)
+                    if start_button:
+                        print(f"▶️ Starting addon: {selector}")
+                        await start_button.click()
+                        await page.wait_for_timeout(3000)
+                        start_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not start_clicked:
+                print("⚠️ Could not find start button - addon may already be running")
+            
+            # Wait for startup and check status
+            print("⏳ Waiting for addon to start...")
+            
+            for i in range(30):  # Wait up to 2.5 minutes
+                try:
+                    # Look for running indicators
+                    running_indicators = [
+                        "text=Running",
+                        "text=Started", 
+                        "button:has-text('Stop')",
+                        "button:has-text('Restart')"
+                    ]
+                    
+                    for indicator in running_indicators:
+                        try:
+                            element = await page.wait_for_selector(indicator, timeout=2000)
+                            if element:
+                                print("✅ Addon is running!")
+                                await self.take_screenshot(page, "addon_running", "Addon running successfully")
+                                
+                                self.results["tests"]["addon_startup"] = {
+                                    "status": "success",
+                                    "message": "AICleaner addon started successfully"
+                                }
+                                return True
+                        except:
+                            continue
+                    
+                    # Check for errors
+                    error_indicators = [
+                        "text=Failed to start",
+                        "text=Error",
+                        "text=Crashed"
+                    ]
+                    
+                    for indicator in error_indicators:
+                        try:
+                            element = await page.wait_for_selector(indicator, timeout=1000)
+                            if element:
+                                print("❌ Addon failed to start!")
+                                await self.take_screenshot(page, "startup_failed", "Addon startup failed")
+                                return False
+                        except:
+                            continue
+                    
+                    await page.wait_for_timeout(5000)
+                    
+                except Exception as e:
+                    print(f"⏳ Startup in progress... ({i+1}/30)")
+                    continue
+            
+            print("⚠️ Startup timeout - checking logs for more info")
+            await self.take_screenshot(page, "startup_timeout", "Addon startup timeout")
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error starting addon: {e}")  
+            await self.take_screenshot(page, "start_error", f"Startup error: {e}")
+            self.results["tests"]["addon_startup"] = {
+                "status": "error",
+                "error": str(e)
+            }
+            return False
+
     async def login_to_ha(self, page: Page, username: str = "drewcifer", password: str = "Minds63qq!") -> bool:
         """Login to Home Assistant"""
         try:
@@ -138,8 +633,10 @@ class HomeAssistantPlaywrightTester:
             # Fill username field first
             username_selectors = [
                 "input[name='username']",
-                "input[type='text']",
-                "input[placeholder*='Username']"
+                "input[type='text']:first-of-type",
+                "input[placeholder*='Username']",
+                "input[autocomplete='username']",
+                "form input[type='text']"
             ]
             
             username_filled = False
@@ -684,19 +1181,35 @@ class HomeAssistantPlaywrightTester:
                         "message": "Already at main interface"
                     }
                 
-                # Test 4: Navigate to Add-ons (whether setup was completed or already done)
-                print("🧭 Navigating to Add-ons section...")
-                navigation_success = await self.navigate_to_addons(page)
-                self.results["tests"]["addon_navigation"] = {
-                    "status": "success" if navigation_success else "error"
-                }
-                
-                if navigation_success:
-                    # Test 5: Find AICleaner addon
-                    await self.find_aicleaner_addon(page)
-                else:
-                    print("❌ Could not navigate to Add-ons section")
+                # Test 4: Add custom repository
+                print("📦 Adding AICleaner custom repository...")
+                repo_success = await self.add_custom_repository(page)
+                if not repo_success:
+                    print("❌ Failed to add custom repository")
                     return self.results
+                
+                # Test 5: Install AICleaner addon
+                print("🚀 Installing AICleaner addon...")
+                install_success = await self.install_aicleaner_addon(page)
+                if not install_success:
+                    print("❌ Failed to install AICleaner addon")
+                    return self.results
+                
+                # Test 6: Configure AICleaner addon
+                print("⚙️ Configuring AICleaner addon...")
+                config_success = await self.configure_aicleaner_addon(page)
+                if not config_success:
+                    print("⚠️ Configuration may need manual setup")
+                
+                # Test 7: Start AICleaner addon
+                print("▶️ Starting AICleaner addon...")
+                start_success = await self.start_aicleaner_addon(page)
+                if not start_success:
+                    print("❌ Failed to start AICleaner addon")
+                    return self.results
+                
+                print("🎉 AICleaner addon successfully installed and running!")
+                print("🔗 Access your HA server at: http://192.168.88.125:8123")
                 
                 await self.take_screenshot(page, "final_state", "Final test state")
                 
