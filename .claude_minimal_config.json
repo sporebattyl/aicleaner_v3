@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "memory": {
-      "command": "C:\\Program Files\\nodejs\\npx.exe",
-      "args": ["-y", "mcp-server-memory"],
-      "cwd": "X:\\aicleaner_v3"
-    }
-  }
-}

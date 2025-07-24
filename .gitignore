@@ -353,6 +353,60 @@ NOTES.md
 TODO.md
 PERSONAL.md
 
+# Claude and development specific files
+.claude/
+.claude*.json
+claude*.json
+claude*.py
+claude*.md
+
+# Prompt and enhancement development files
+*prompt*.py
+*prompt*.md
+*enhancement*.py
+*enhancement*.md
+*gemini*.py
+*gemini*.md
+*collaboration*.py
+*collaboration*.md
+finalized*prompts/
+prompt_backups/
+enhancement_logs/
+enhancement_patches/
+
+# Development scripts and tools
+*_agent.py
+request_*.py
+consensus*.py
+final*.py
+*feedback*.py
+*review*.py
+readiness*.py
+*diff*.py
+*collaboration*.py
+implement*.py
+setup*.py
+setup*.ps1
+setup*.bat
+verify*.bat
+get*.py
+*zen*.py
+*mcp*.py
+*phase*.md
+*claude*.md
+
+# Test and validation files
+test_*.py
+validate_*.py
+playwright*.py
+find_*.py
+
+# Results and output files
+*_results.json
+*phase*.json
+*diff*.md
+*enhancement*.diff
+
 # OS generated files
 .DS_Store?
 ehthumbs.db
