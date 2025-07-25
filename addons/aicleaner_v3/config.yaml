@@ -1,7 +1,7 @@
 name: "AICleaner V3"
-version: "1.0.0"
+version: "1.0.1"
 slug: "aicleaner_v3"
-description: "Intelligently cleans and processes data using AI."
+description: "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration"
 url: "https://github.com/drewcifer/aicleaner_v3/tree/main/addons/aicleaner_v3"
 arch:
   - aarch64
@@ -16,77 +16,47 @@ hassio_api: true
 hassio_role: default
 homeassistant_api: true
 host_network: false
-privileged: false
+privileged: []
+ingress: true
+ingress_port: 8080
+panel_icon: "mdi:robot-vacuum"
+panel_title: "AI Cleaner v3"
 map:
   - data:rw
   - config:rw
   - ssl:ro
 ports: {}
 options:
-  # General settings
-  active_provider: "ollama"
+  # Essential settings only - MQTT and Dashboard are auto-configured
   log_level: "info"
+  device_id: "aicleaner_v3"
   
-  # AI Provider API Keys
-  api_key_openai: ""
-  api_key_gemini: ""
-  ollama_base_url: "http://localhost:11434"
-  ollama_default_model: "llama2"
+  # AI Provider API Keys (optional - can use local Ollama)
+  primary_api_key: ""
+  backup_api_keys: []
   
-  # MQTT Broker settings
-  mqtt_host: "core-mosquitto"
-  mqtt_port: 1883
-  mqtt_username: ""
-  mqtt_password: ""
-  mqtt_client_id: "aicleaner_v3"
-  mqtt_discovery_enabled: true
+  # MQTT Discovery (automatically configured via Home Assistant services)
   mqtt_discovery_prefix: "homeassistant"
   
-  # Service API settings
-  api_port: 8099
-  api_key_enabled: false
-  api_key: ""
-  
-  # Performance settings
-  cache_enabled: true
-  metrics_retention_days: 7
-  
-  # Security settings
-  key_rotation_enabled: true
-  default_rotation_days: 30
+  # Advanced options (optional)
+  debug_mode: false
+  auto_dashboard: true
 
 schema:
-  # General settings
-  active_provider: "list(openai|anthropic|gemini|ollama)"
-  log_level: "list(trace|debug|info|notice|warning|error|fatal)"
+  # Essential settings
+  log_level: "list(debug|info|warning|error)"
+  device_id: "str"
   
-  # AI Provider API Keys
-  api_key_openai: "password"
-  api_key_gemini: "password"
-  ollama_base_url: "url"
-  ollama_default_model: "str"
+  # AI Provider API Keys (optional)
+  primary_api_key: "password?"
+  backup_api_keys: ["password?"]
   
-  # MQTT Broker settings
-  mqtt_host: "str"
-  mqtt_port: "port"
-  mqtt_username: "str?"
-  mqtt_password: "password?"
-  mqtt_client_id: "str"
-  mqtt_discovery_enabled: "bool"
+  # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
   
-  # Service API settings
-  api_port: "port"
-  api_key_enabled: "bool"
-  api_key: "password?"
-  
-  # Performance settings
-  cache_enabled: "bool"
-  metrics_retention_days: "int"
-  
-  # Security settings
-  key_rotation_enabled: "bool"
-  default_rotation_days: "int"
+  # Advanced options
+  debug_mode: "bool"
+  auto_dashboard: "bool"
 services:
   - "mqtt:want"
 image: "ghcr.io/drewcifer/aicleaner_v3/{arch}"
