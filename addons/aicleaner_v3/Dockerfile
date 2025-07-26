@@ -18,6 +18,9 @@ RUN apk add --no-cache \
     linux-headers \
     python3-dev
 
+# Install bashio for Home Assistant add-on integration
+RUN pip3 install --no-cache-dir --break-system-packages bashio
+
 # Set up a non-root user for security
 RUN addgroup -S app && adduser -S -G app app
 

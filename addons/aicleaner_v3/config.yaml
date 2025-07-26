@@ -63,15 +63,15 @@ schema:
   mqtt_discovery_prefix: "str"
   
   # Entity Selections (Basic Mode)
-  default_camera: "entity(camera)?"
-  default_todo_list: "entity(todo)?"
+  default_camera: "match(^(camera\\.[a-zA-Z0-9_]+)?$)?"
+  default_todo_list: "match(^(todo\\.[a-zA-Z0-9_]+)?$)?"
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"
   zones:
     - name: "str"
-      camera_entity: "entity(camera)"
-      todo_list_entity: "entity(todo)"
+      camera_entity: "match(^camera\\.[a-zA-Z0-9_]+$)"
+      todo_list_entity: "match(^todo\\.[a-zA-Z0-9_]+$)"
       check_interval_minutes: "int(1,1440)"
       ignore_rules: [str]
   
