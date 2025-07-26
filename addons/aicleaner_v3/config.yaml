@@ -2,7 +2,7 @@ name: "AICleaner V3"
 version: "1.0.1"
 slug: "aicleaner_v3"
 description: "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration"
-url: "https://github.com/drewcifer/aicleaner_v3/tree/main/addons/aicleaner_v3"
+url: "https://github.com/sporebattyl/aicleaner_v3/tree/main/addons/aicleaner_v3"
 arch:
   - aarch64
   - amd64
@@ -63,15 +63,15 @@ schema:
   mqtt_discovery_prefix: "str"
   
   # Entity Selections (Basic Mode)
-  default_camera: "entity(camera)?"
-  default_todo_list: "entity(todo)?"
+  default_camera: "str?"
+  default_todo_list: "str?"
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"
   zones:
     - name: "str"
-      camera_entity: "entity(camera)"
-      todo_list_entity: "entity(todo)"
+      camera_entity: "str"
+      todo_list_entity: "str"
       check_interval_minutes: "int(1,1440)"
       ignore_rules: ["str"]
   
@@ -80,4 +80,4 @@ schema:
   auto_dashboard: "bool"
 services:
   - "mqtt:want"
-image: "ghcr.io/drewcifer/aicleaner_v3/{arch}"
+image: "ghcr.io/sporebattyl/aicleaner_v3/{arch}"
