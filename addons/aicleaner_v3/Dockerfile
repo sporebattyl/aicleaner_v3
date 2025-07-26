@@ -31,17 +31,19 @@ RUN mkdir -p /data /config && chown -R app:app /data /config /app
 # Copy requirements and install as root, then switch user
 COPY requirements.txt .
 
-# Handle armv7 architecture build issues with architecture-specific installation
-ARG TARGETARCH
-RUN if [ "$TARGETARCH" = "arm/v7" ]; then \
-        echo "Installing for armv7 architecture with optimizations..." && \
-        apk add --no-cache py3-cryptography py3-psutil && \
-        pip install --no-cache-dir --prefer-binary --no-build-isolation \
-            --only-binary=cryptography,psutil -r requirements.txt; \
-    else \
-        echo "Installing for $TARGETARCH architecture..." && \
-        pip install --no-cache-dir -r requirements.txt; \
-    fi
+# Handle architecture-specific installation, especially for ARM builds
+ARG BUILD_FROM
+RUN echo "Building from base image: $BUILD_FROM" && \
+    case "$BUILD_FROM" in \
+        *armv7*|*armhf*) \
+            echo "Installing for ARM architecture with optimizations..." && \
+            apk add --no-cache py3-cryptography py3-psutil && \
+            pip install --no-cache-dir --prefer-binary --no-build-isolation \
+                --only-binary=cryptography,psutil -r requirements.txt ;; \
+        *) \
+            echo "Installing for standard architecture..." && \
+            pip install --no-cache-dir -r requirements.txt ;; \
+    esac
 
 # Copy source code with proper ownership
 COPY --chown=app:app src/ ./src/
