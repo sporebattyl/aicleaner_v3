@@ -1,0 +1,113 @@
+# Basic Docker Compose for AICleaner v3 with Ollama
+# Minimal setup for testing and development
+
+# version: '3.8'  # Version is obsolete in newer Docker Compose
+
+services:
+  # Ollama service for local LLM inference
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: aicleaner-ollama-basic
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/data/models
+      - ./scripts:/scripts:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - aicleaner_network
+    healthcheck:
+      test: ["CMD", "/scripts/health-check.sh", "quick"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # AICleaner main application
+  aicleaner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_FROM: python:3.11-alpine
+    container_name: aicleaner-app-basic
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    volumes:
+      - aicleaner_data:/data/aicleaner
+      - aicleaner_config:/config
+      - aicleaner_logs:/logs
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      # Ollama Configuration
+      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      
+      # AICleaner Configuration
+      - AICLEANER_DATA_PATH=/data/aicleaner
+      - AICLEANER_LOG_LEVEL=INFO
+      - AICLEANER_PRIVACY_LEVEL=standard
+      
+      # Home Assistant Integration (set these in .env file)
+      - HA_TOKEN=${HA_TOKEN:-}
+      - HA_URL=${HA_URL:-http://homeassistant:8123}
+      
+      # Performance Settings
+      - MAX_MEMORY_USAGE=2048
+      - MAX_CPU_USAGE=70
+      - QUANTIZATION_LEVEL=4
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - aicleaner_network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:8099', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Named volumes for persistent data
+volumes:
+  ollama_models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/ollama_models
+  aicleaner_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/aicleaner
+  aicleaner_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/config
+  aicleaner_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/logs
+
+# Custom network for container communication
+networks:
+  aicleaner_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

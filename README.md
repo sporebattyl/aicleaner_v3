@@ -1,497 +1,490 @@
-# AICleaner v3
+# AICleaner V3 - Home Assistant Add-on
 
-> **Simple, powerful AI automation for Home Assistant hobbyists**
+![Supports aarch64 Architecture][aarch64-shield] ![Supports amd64 Architecture][amd64-shield] ![Supports armhf Architecture][armhf-shield] ![Supports armv7 Architecture][armv7-shield] ![Supports i386 Architecture][i386-shield]
 
-[![GitHub Release](https://img.shields.io/github/release/drewcifer/aicleaner_v3.svg?style=flat-square)](https://github.com/drewcifer/aicleaner_v3/releases)
-[![License](https://img.shields.io/github/license/drewcifer/aicleaner_v3.svg?style=flat-square)](LICENSE)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Integration-blue.svg?style=flat-square)](https://www.home-assistant.io/)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 
-AICleaner v3 is a streamlined AI automation system designed for Home Assistant enthusiasts who want powerful AI capabilities without enterprise complexity.
+An intelligent Home Assistant add-on that uses AI to monitor your home cameras and automatically generate cleaning task lists based on visual analysis. Never miss a mess with AI-powered zone monitoring and automated task management.
 
-## ✨ Key Features
+## 🚀 Features
 
-- 🎯 **Power-User Focused**: Simple configuration, maximum functionality
-- 🔄 **Dynamic Provider Switching**: Automatic failover between OpenAI, Anthropic, Gemini, and Ollama
-- 📷 **Smart Camera Analysis**: AI-powered security and monitoring
-- 🏠 **Native HA Integration**: Clean service calls and sensors
-- ⚡ **Hot Configuration Reloading**: Update settings without restarts
-- 📊 **Performance Monitoring**: Built-in metrics and cost tracking
-- 🚀 **Lightweight Architecture**: 75% less resource usage than enterprise alternatives
+- **🤖 AI-Powered Visual Analysis**: Uses advanced AI models to analyze camera feeds and identify cleaning tasks
+- **🏠 Intelligent Zone Monitoring**: Configure multiple zones with custom cameras and purposes
+- **📋 Automated Task Generation**: Automatically creates and manages cleaning tasks in Home Assistant todo lists
+- **🔄 MQTT Discovery Integration**: Seamlessly integrates with Home Assistant via MQTT
+- **📊 Dashboard Integration**: Auto-configures dashboard cards for easy monitoring
+- **🛡️ Comprehensive Validation**: Input validation and error handling for reliable operation
+- **🔒 Security-First Design**: Secure configuration with proper permissions and validation
+- **🌐 Web Interface**: Built-in web UI for configuration and monitoring
+- **⚡ Health Monitoring**: Real-time system health checks and error reporting
+- **🔔 Smart Notifications**: User notifications for critical events and errors
 
-## 🏗️ Architecture
+## 📋 Requirements
 
-### Core Service (Backend)
+### Home Assistant Requirements
+- **Home Assistant**: Version 2023.1.0 or newer
+- **MQTT Integration**: Must be configured and running
+- **Camera Entities**: At least one camera entity for monitoring
+- **Todo Integration**: For task list management
+
+### Hardware Requirements
+- **Memory**: 512MB RAM minimum, 1GB recommended
+- **Storage**: 100MB available space
+- **CPU**: ARM64, AMD64, or compatible architecture
+
+### API Keys (Optional)
+- **Google AI API Key**: For cloud-based AI analysis (recommended)
+- **Backup API Keys**: Additional keys for redundancy
+- **Local Ollama**: Alternative to cloud APIs (requires separate setup)
+
+## 🛠️ Installation
+
+### 1. Add the Repository
+Add this repository to your Home Assistant add-on store:
+
 ```
-FastAPI Service (localhost:8000)
-├── AI Provider Factory (OpenAI, Anthropic, Gemini, Ollama)
-├── Intelligent Failover Engine
-├── Performance Monitoring & Circuit Breakers
-├── Configuration Hot-Reloading
-└── RESTful API with OpenAPI docs
+https://github.com/sporebattyl/aicleaner_v3
 ```
 
-### HA Integration (Frontend)
+### 2. Install the Add-on
+1. Navigate to **Supervisor** → **Add-on Store**
+2. Find "AICleaner V3" in the store
+3. Click **Install**
+
+### 3. Configure the Add-on
+Edit the add-on configuration with your preferences:
+
+```yaml
+log_level: info
+device_id: aicleaner_v3
+primary_api_key: "your-google-ai-api-key"  # Optional
+backup_api_keys: []                        # Optional
+mqtt_discovery_prefix: homeassistant
+debug_mode: false
+auto_dashboard: true
 ```
-Custom Component (aicleaner)
-├── Thin API Client
-├── Data Coordinator (30s updates)
-├── Status & Performance Sensors
-└── Automation Services (analyze_camera, generate_text, etc.)
-```
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Home Assistant (2024.1+)
-- Python 3.11+
-- At least one AI provider API key
-
-### Installation
-
-1. **Clone Repository**
-   ```bash
-   git clone https://github.com/username/aicleaner_v3.git
-   cd aicleaner_v3
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure AI Providers**
-   ```bash
-   cp core/config.default.yaml core/config.user.yaml
-   # Edit config.user.yaml with your API keys
-   ```
-
-4. **Start Core Service**
-   ```bash
-   python3 -m core.service
-   ```
-   Service runs on http://localhost:8000
-
-5. **Install HA Integration**
-   ```bash
-   cp -r custom_components/aicleaner /config/custom_components/
-   # Restart Home Assistant
-   ```
-
-6. **Add Integration**
-   - Go to Settings > Devices & Services
-   - Add Integration > Search "AICleaner"
-   - Configure: Host: `localhost`, Port: `8000`
+### 4. Start the Add-on
+1. Click **Start**
+2. Enable **Auto-start** if desired
+3. Check logs for successful startup
 
 ## ⚙️ Configuration
 
-### Basic Configuration (`core/config.user.yaml`)
+### Required Settings
+
+| Parameter | Description | Default | Type |
+|-----------|-------------|---------|------|
+| `log_level` | Logging verbosity (debug, info, warning, error) | `info` | `list` |
+| `device_id` | Unique device identifier | `aicleaner_v3` | `str` |
+
+### API Configuration
+
+| Parameter | Description | Default | Type |
+|-----------|-------------|---------|------|
+| `primary_api_key` | Primary Google AI API key | `""` | `password?` |
+| `backup_api_keys` | List of backup API keys | `[]` | `[password?]` |
+
+### MQTT Settings
+
+| Parameter | Description | Default | Type |
+|-----------|-------------|---------|------|
+| `mqtt_discovery_prefix` | MQTT discovery prefix | `homeassistant` | `str` |
+
+### Advanced Options
+
+| Parameter | Description | Default | Type |
+|-----------|-------------|---------|------|
+| `debug_mode` | Enable debug logging | `false` | `bool` |
+| `auto_dashboard` | Auto-configure dashboard | `true` | `bool` |
+
+## 🏠 Zone Configuration
+
+Access the web interface via Home Assistant Ingress or at the addon's web port.
+
+### Adding Zones
+1. Click **Configure Zones**
+2. Click **Add New Zone**
+3. Configure zone parameters:
+   - **Zone Name**: Descriptive name (e.g., "Kitchen")
+   - **Purpose**: What this zone is for (e.g., "Cooking and dining area")
+   - **Camera Entity**: Select monitoring camera
+   - **Todo List Entity**: Select target todo list
+   - **Check Interval**: Minutes between checks (1-1440)
+   - **Ignore Rules**: Things to ignore (optional)
+
+### Zone Examples
 
 ```yaml
-# Essential configuration for hobbyist use
-general:
-  active_provider: "gemini"  # Primary provider
+# Kitchen Zone
+name: "Kitchen"
+purpose: "Cooking and dining area"
+camera_entity: "camera.kitchen"
+todo_list_entity: "todo.household_tasks"
+interval_minutes: 30
+ignore_rules:
+  - "normal cooking mess"
+  - "dishes in sink"
 
-ai_providers:
-  gemini:
-    api_key: "${GEMINI_API_KEY}"
-    default_model: "gemini-2.5-pro"
-  
-  openai:
-    api_key: "${OPENAI_API_KEY}"
-    default_model: "gpt-4o"
-  
-  ollama:
-    base_url: "http://localhost:11434"
-    default_model: "llama3.2"
-
-service:
-  api:
-    host: "0.0.0.0"
-    port: 8000
-
-performance:
-  cache:
-    enabled: true
-  metrics_retention_days: 7
+# Living Room Zone
+name: "Living Room"
+purpose: "Entertainment and relaxation area"
+camera_entity: "camera.living_room"
+todo_list_entity: "todo.cleaning_tasks"
+interval_minutes: 60
+ignore_rules:
+  - "throw pillows"
+  - "remote controls"
 ```
 
-### Environment Variables
+## 🌐 Web Interface
 
+The add-on provides a comprehensive web interface accessible via Home Assistant Ingress:
+
+### Status Monitoring
+- **Real-time Status**: Addon health and operational state
+- **Connection Health**: MQTT and core service connectivity
+- **AI Metrics**: Request counts and last analysis time
+- **Component Status**: Individual system component health
+
+### Configuration Tools
+- **Zone Management**: Add, edit, and remove monitoring zones
+- **Configuration Validation**: Comprehensive system validation
+- **Error Monitoring**: Recent errors and system issues
+- **Notification History**: User notification tracking
+
+### Available Actions
+- **Test AI Generation**: Verify AI connectivity and functionality
+- **Refresh Status**: Update system status display
+- **Show Configuration**: View current addon configuration
+- **Configure Zones**: Manage zone settings and parameters
+- **Validate Configuration**: Run comprehensive system checks
+
+## 🛡️ Security Features
+
+### Input Validation
+- **Entity ID Validation**: Ensures proper Home Assistant entity format
+- **Zone Name Sanitization**: Prevents injection attacks and invalid characters
+- **API Key Validation**: Secure API key format verification
+- **File Path Protection**: Prevents directory traversal attacks
+
+### Permission Management
+- **Non-privileged Execution**: Runs as non-root user
+- **Minimal Permissions**: Only required Home Assistant API access
+- **Secure File Access**: Restricted to designated data directories
+- **Environment Validation**: Secure environment variable handling
+
+### Error Handling
+- **Comprehensive Error Classification**: Categorized error handling
+- **User-friendly Messages**: Clear error communication
+- **Automatic Notifications**: Critical error alerting
+- **Persistent Logging**: Error tracking and analysis
+
+## 📊 Monitoring & Health Checks
+
+### Health Endpoints
+Access these endpoints via the web interface:
+
+- `/api/health` - Comprehensive system health status
+- `/api/errors` - Recent error information and statistics
+- `/api/notifications` - Notification history
+- `/api/validate_config` - Configuration validation results
+
+### Health Check Components
+- **Addon Status**: Core application health
+- **MQTT Connection**: Message broker connectivity
+- **Core Service**: AI processing service availability
+- **Error Handler**: Error management system status
+
+### MQTT Discovery Topics
+```
+homeassistant/sensor/aicleaner_v3_status/config
+homeassistant/sensor/aicleaner_v3_last_analysis/config
+homeassistant/button/aicleaner_v3_analyze_now/config
+```
+
+### Log Files
+- `/data/aicleaner.log` - Application logs with rotation
+- `/data/error_log.json` - Structured error tracking
+- `/data/zones.json` - Zone configuration backup
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### Add-on Won't Start
+1. **Check Logs**: Review Home Assistant supervisor logs
+2. **MQTT Status**: Verify MQTT integration is running
+3. **Permissions**: Ensure required Home Assistant API permissions
+4. **Configuration**: Use web interface validation tool
+
+**Solution Steps:**
 ```bash
-export GEMINI_API_KEY="your-gemini-key"
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
-export AICLEANER_API_KEY="your-secure-api-key"  # Optional for production
+# Check MQTT integration
+# Home Assistant → Settings → Devices & Services → MQTT
+
+# Validate configuration
+# Use web interface → Validate Configuration
+
+# Check addon logs
+# Supervisor → AICleaner V3 → Log tab
 ```
 
-## 🔐 Security Configuration
+#### AI Analysis Not Working
+1. **API Keys**: Verify Google AI API key configuration
+2. **Connectivity**: Check internet connection
+3. **Service Test**: Use "Test AI Generation" in web interface
+4. **Error Logs**: Review API-specific errors
 
-AICleaner v3 includes **optional API key authentication** for production deployments while remaining **hobbyist-friendly** by default.
+#### Camera Access Issues
+1. **Entity Verification**: Confirm camera entities exist
+2. **Permissions**: Check camera stream access rights
+3. **Availability**: Ensure cameras are not locked by other services
+4. **Testing**: Verify camera access in Home Assistant
 
-### Security Modes
+#### Task Creation Problems
+1. **Todo Integration**: Verify Home Assistant todo integration
+2. **Entity Access**: Check todo list entity permissions
+3. **Zone Configuration**: Review zone-to-todo list mappings
 
-#### Hobbyist Mode (Default - No Authentication)
-```yaml
-# core/config.user.yaml
-service:
-  api:
-    api_key_enabled: false  # Default: disabled for easy setup
-```
-- ✅ **No setup required** - works immediately
-- ✅ **Perfect for home networks** behind router firewall
-- ⚠️ **Not recommended** for public internet exposure
-
-#### Production Mode (API Key Authentication)
-```yaml
-# core/config.user.yaml
-service:
-  api:
-    api_key_enabled: true
-    api_key: "${AICLEANER_API_KEY}"
-```
-
-```bash
-# Set secure API key via environment variable
-export AICLEANER_API_KEY="your-very-secure-random-api-key-here"
-```
-
-- 🔒 **Secure** - All sensitive endpoints protected
-- 🏠 **Local bypass** - localhost connections still work without key
-- 🔑 **HA Integration** - Automatically uses X-API-Key headers
-
-### Security Best Practices
-
-1. **Generate Strong API Keys**:
-   ```bash
-   # Generate a secure random key
-   openssl rand -base64 32
-   ```
-
-2. **Environment Variables Only**:
-   ```bash
-   # ✅ Good - use environment variables
-   export AICLEANER_API_KEY="$(openssl rand -base64 32)"
-   
-   # ❌ Bad - never put keys directly in YAML files
-   api_key: "hardcoded-key-bad"
-   ```
-
-3. **Network Security**:
-   - Keep service on `localhost:8000` for internal HA access
-   - Use HA's authentication for external access
-   - Enable API key authentication if exposing service externally
-
-### Upgrading Security
-
-**To enable authentication on existing installation:**
-
-1. **Generate API key**:
-   ```bash
-   export AICLEANER_API_KEY="$(openssl rand -base64 32)"
-   echo "Save this key: $AICLEANER_API_KEY"
-   ```
-
-2. **Update configuration**:
-   ```yaml
-   # core/config.user.yaml
-   service:
-     api:
-       api_key_enabled: true
-       api_key: "${AICLEANER_API_KEY}"
-   ```
-
-3. **Update HA integration** (if using API key):
-   ```yaml
-   # configuration.yaml
-   aicleaner:
-     host: "localhost"
-     port: 8000
-     api_key: !env_var AICLEANER_API_KEY
-   ```
-
-4. **Restart core service**:
-   ```bash
-   # The service will now require API key for external requests
-   python3 -m core.service
-   ```
-
-> **Note**: Local requests (127.0.0.1, localhost) always bypass authentication for convenience.
-
-## 🎮 Usage Examples
-
-### Camera Analysis Automation
+### Debug Mode
+Enable comprehensive debugging:
 
 ```yaml
-automation:
-  - alias: "Motion Analysis"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.front_door_motion
-        to: "on"
-    action:
-      - service: aicleaner.analyze_camera
-        data:
-          entity_id: camera.front_door
-          prompt: "Analyze for security concerns, visitors, or packages"
-          provider: "gemini"
-      - wait_for_trigger:
-          - platform: event
-            event_type: aicleaner_analysis_complete
-        timeout: "00:01:00"
-      - service: notify.mobile_app
-        data:
-          title: "Motion Detected"
-          message: "{{ trigger.event.data.result.text }}"
+debug_mode: true
+log_level: debug
 ```
 
-### Smart Text Generation
+### Configuration Validation
+Use the built-in validation system:
+1. Access web interface
+2. Click **Validate Configuration**
+3. Review validation results
+4. Address reported issues
 
-```yaml
-automation:
-  - alias: "Daily Summary"
-    trigger:
-      - platform: time
-        at: "18:00:00"
-    action:
-      - service: aicleaner.generate_text
-        data:
-          prompt: >
-            Generate a daily home summary including:
-            - Security events: {{ states('sensor.daily_motion_count') }}
-            - Energy usage: {{ states('sensor.daily_energy') }} kWh
-            - Weather: {{ states('weather.home') }}
-            Keep it friendly and under 100 words.
-          temperature: 0.5
-```
+## 🔄 API Reference
 
-### Provider Health Monitoring
+### Core Endpoints
 
-```yaml
-automation:
-  - alias: "Provider Failover"
-    trigger:
-      - platform: state
-        entity_id: sensor.aicleaner_providers
-        to: "0"
-    action:
-      - service: aicleaner.check_provider_status
-        data:
-          provider: "ollama"
-      - service: aicleaner.switch_provider
-        data:
-          provider: "ollama"
-```
+#### Status Information
+```http
+GET /api/status
+Content-Type: application/json
 
-## 📡 Available Services
-
-### `aicleaner.analyze_camera`
-Analyze camera images with AI vision models.
-
-**Parameters:**
-- `entity_id` (required): Camera entity to analyze
-- `prompt` (optional): Analysis instructions
-- `provider` (optional): Specific AI provider to use
-- `save_result` (optional): Save to sensor (default: true)
-
-### `aicleaner.generate_text`
-Generate text responses for automations.
-
-**Parameters:**
-- `prompt` (required): Text generation prompt
-- `provider` (optional): Specific AI provider to use
-- `temperature` (optional): Creativity level (0.0-2.0)
-- `max_tokens` (optional): Maximum response length
-
-### `aicleaner.check_provider_status`
-Check availability of specific AI provider.
-
-**Parameters:**
-- `provider` (required): Provider name to check
-
-### `aicleaner.switch_provider`
-Switch active AI provider.
-
-**Parameters:**
-- `provider` (required): Provider to switch to
-
-## 📊 Monitoring & Sensors
-
-### Status Sensors
-- `sensor.aicleaner_status`: Service health (ok/degraded/error)
-- `sensor.aicleaner_uptime`: Service uptime in seconds
-- `sensor.aicleaner_providers`: Number of available providers
-
-### Result Sensors
-- `sensor.aicleaner_last_analysis`: Latest camera analysis result
-- `sensor.aicleaner_last_generation`: Latest text generation result
-
-### Metrics API
-Access detailed metrics at: http://localhost:8000/v1/metrics
-
-```json
+Response:
 {
-  "uptime_seconds": 3600,
-  "total_requests": 45,
-  "requests_per_minute": 0.75,
-  "average_response_time_ms": 1200,
-  "error_rate": 2.2,
-  "providers": {
-    "gemini": {
-      "requests": 25,
-      "avg_response_time": 800,
-      "success_rate": 100,
-      "cost": 0.05
-    }
+  "status": "connected",
+  "enabled": true,
+  "mqtt_connected": true,
+  "core_service_health": true,
+  "ai_response_count": 42,
+  "last_ai_request": "2024-01-15T10:30:00Z"
+}
+```
+
+#### Health Monitoring
+```http
+GET /api/health
+Content-Type: application/json
+
+Response:
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "components": {
+    "addon": {"status": "connected", "enabled": true},
+    "mqtt": {"connected": true},
+    "core_service": {"available": true}
   }
 }
 ```
 
-## 🔧 Advanced Features
+#### Zone Management
+```http
+GET /api/zones
+POST /api/zones
+Content-Type: application/json
 
-### Hot Configuration Reloading
-Update configuration without restarting:
-```bash
-curl -X POST http://localhost:8000/v1/config/reload
+POST Body:
+{
+  "zones": [
+    {
+      "name": "Kitchen",
+      "camera_entity": "camera.kitchen",
+      "todo_list_entity": "todo.household",
+      "interval_minutes": 30
+    }
+  ]
+}
 ```
 
-### Circuit Breaker Protection
-Automatic provider failover when issues detected:
-- Failed requests trigger circuit breaker
-- Exponential backoff for recovery
-- Performance-based provider selection
+#### Configuration Validation
+```http
+GET /api/validate_config
+Content-Type: application/json
 
-### Cost Tracking
-Monitor AI usage costs:
-- Per-provider cost breakdown
-- Token usage tracking
-- Monthly/daily spending summaries
-
-### Performance Optimization
-- Request caching for repeated queries
-- Intelligent model selection
-- Resource usage monitoring
-
-## 🔄 Migration from Complex Versions
-
-If migrating from enterprise/complex versions:
-
-1. **Run Migration Analysis**
-   ```bash
-   python3 scripts/migrate_ha_integration.py --dry-run
-   ```
-
-2. **Execute Migration**
-   ```bash
-   python3 scripts/migrate_ha_integration.py
-   ```
-
-3. **Follow Migration Guide**
-   See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for detailed instructions.
-
-## 🛠️ API Reference
-
-### Core Service API
-Interactive API documentation available at: http://localhost:8000/docs
-
-### Key Endpoints
-- `GET /v1/status` - Service health status
-- `POST /v1/generate` - Generate AI responses
-- `GET /v1/providers/status` - Provider availability
-- `POST /v1/providers/switch` - Switch active provider
-- `GET /v1/metrics` - Performance metrics
-- `GET /v1/config` - Current configuration
-
-## 🎯 Design Philosophy
-
-AICleaner v3 follows these principles:
-
-1. **Hobbyist-First**: Optimized for personal use, not enterprise scale
-2. **Simplicity Over Features**: Clean, maintainable codebase
-3. **Power-User Friendly**: Advanced features without complexity
-4. **Resource Conscious**: Minimal CPU, memory, and storage usage
-5. **Self-Contained**: Minimal external dependencies
-
-## 📈 Performance Benchmarks
-
-| Metric | Enterprise Version | AICleaner v3 | Improvement |
-|--------|-------------------|--------------|-------------|
-| Memory Usage | ~200MB | ~50MB | **75% less** |
-| Startup Time | 30-45s | 5-10s | **70% faster** |
-| Code Complexity | 2000+ LOC | 500 LOC | **75% reduction** |
-| Configuration Files | 5-8 files | 1-2 files | **60% simpler** |
-| API Response Time | 2-5s | 0.5-2s | **50% faster** |
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Service won't start**
-```bash
-# Check configuration
-python3 -c "from core.config_loader import config_loader; print('Config OK')"
-
-# Check port availability
-netstat -tlnp | grep 8000
+Response:
+{
+  "overall_status": "valid",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "validations": {
+    "environment": {"valid": true},
+    "security": {"secure": true},
+    "dependencies": {"satisfied": true}
+  }
+}
 ```
 
-**HA Integration connection fails**
-```bash
-# Test core service
-curl http://localhost:8000/v1/status
+## 🎛️ Dashboard Integration
 
-# Check Home Assistant logs
-tail -f /config/home-assistant.log | grep aicleaner
+When `auto_dashboard` is enabled, the addon automatically creates:
+
+### Auto-Generated Cards
+- **Status Card**: Real-time addon health and metrics
+- **Zone Cards**: Individual monitoring cards for each zone
+- **Control Panel**: Quick action buttons for manual operations
+- **Statistics Card**: AI usage analytics and trends
+
+### Manual Dashboard Configuration
+If auto-dashboard is disabled, add cards manually:
+
+```yaml
+# Status Card
+type: entities
+title: AICleaner V3 Status
+entities:
+  - sensor.aicleaner_v3_status
+  - sensor.aicleaner_v3_last_analysis
+  - switch.aicleaner_v3_enabled
+
+# Zone Monitoring Card
+type: picture-entity
+title: Kitchen Monitoring
+entity: camera.kitchen
+camera_image: camera.kitchen
+tap_action:
+  action: call-service
+  service: aicleaner.analyze_zone
+  service_data:
+    zone_name: Kitchen
 ```
 
-**No providers available**
+## 🔧 Development & Contributing
+
+### Local Development Setup
 ```bash
-# Check API keys
-curl -H "Content-Type: application/json" http://localhost:8000/v1/providers/status
-```
-
-### Diagnostics
-Run the built-in diagnostic tool:
-```bash
-python3 scripts/diagnose_system.py --full
-```
-
-## 🤝 Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-```bash
-git clone https://github.com/username/aicleaner_v3.git
+# Clone repository
+git clone https://github.com/sporebattyl/aicleaner_v3.git
 cd aicleaner_v3
-pip install -r requirements-dev.txt
-pre-commit install
+
+# Build development image
+docker build -t aicleaner_v3:dev addons/aicleaner_v3/
+
+# Run tests
+python -m pytest tests/
 ```
 
-### Testing
-```bash
-pytest tests/
+### Project Structure
 ```
+addons/aicleaner_v3/
+├── config.yaml              # Home Assistant addon configuration
+├── Dockerfile               # Container build definition
+├── requirements.txt         # Python dependencies
+├── run.sh                  # Container startup script
+├── README.md               # This documentation
+└── src/                    # Application source code
+    ├── main.py             # Main application entry point
+    ├── web_ui.py           # Web interface and API endpoints
+    ├── validation.py       # Input validation and sanitization
+    ├── error_handler.py    # Error management and notifications
+    ├── config_validator.py # Configuration validation system
+    └── mqtt_client.py      # MQTT integration
+```
+
+### Contributing Guidelines
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Implement** changes with tests
+4. **Validate** code quality and security
+5. **Submit** a pull request
+
+## 📝 Changelog
+
+### Version 1.0.0 (Current)
+- ✨ **New**: AI-powered zone monitoring with camera analysis
+- ✨ **New**: Comprehensive input validation and security framework
+- ✨ **New**: MQTT discovery integration with automatic entity creation
+- ✨ **New**: Automatic dashboard configuration and management
+- ✨ **New**: Web-based configuration interface with real-time status
+- ✨ **New**: Advanced error handling with user notifications
+- ✨ **New**: Health monitoring system with API endpoints
+- ✨ **New**: Configuration validation and security checks
+- 🛡️ **Security**: Non-privileged container execution
+- 🛡️ **Security**: Input sanitization and validation
+- 📊 **Monitoring**: Comprehensive health checks and error tracking
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Home Assistant community for inspiration
-- AI providers (OpenAI, Anthropic, Google, Ollama) for powerful APIs
-- Contributors and beta testers
+- **Home Assistant Community** for integration patterns and best practices
+- **Google AI** for Gemini API and advanced AI capabilities
+- **Ollama Project** for local AI model support
+- **MQTT Community** for reliable messaging protocols
+- **All Contributors** and beta testers
 
-## 📞 Support
+## 🆘 Support
 
-- **Documentation**: [Wiki](https://github.com/username/aicleaner_v3/wiki)
-- **Issues**: [GitHub Issues](https://github.com/username/aicleaner_v3/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/username/aicleaner_v3/discussions)
-- **Discord**: [Community Chat](https://discord.gg/aicleaner)
+### Getting Help
+- **📋 Issues**: [GitHub Issues](https://github.com/sporebattyl/aicleaner_v3/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/sporebattyl/aicleaner_v3/discussions)
+- **🏠 Forum**: [Home Assistant Community](https://community.home-assistant.io/)
+
+### Before Reporting Issues
+1. Check existing [issues](https://github.com/sporebattyl/aicleaner_v3/issues)
+2. Use configuration validation tool
+3. Review addon logs
+4. Test with minimal configuration
+
+### Issue Report Template
+```
+**Environment:**
+- Home Assistant Version: 
+- Addon Version: 
+- Architecture: 
+
+**Configuration:**
+[Sanitized configuration without API keys]
+
+**Problem Description:**
+[Clear description of the issue]
+
+**Steps to Reproduce:**
+1. 
+2. 
+3. 
+
+**Expected Behavior:**
+[What should happen]
+
+**Logs:**
+[Relevant log entries]
+```
+
+## 🔗 Links
+
+- **🏠 Repository**: https://github.com/sporebattyl/aicleaner_v3
+- **📚 Documentation**: [Project Wiki](https://github.com/sporebattyl/aicleaner_v3/wiki)
+- **🐛 Bug Reports**: [Issue Tracker](https://github.com/sporebattyl/aicleaner_v3/issues)
+- **💡 Feature Requests**: [Discussions](https://github.com/sporebattyl/aicleaner_v3/discussions)
 
 ---
 
-**Made with ❤️ for the Home Assistant community**
-
-*AICleaner v3: Simple AI automation that just works.*
+[aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
+[amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
+[armhf-shield]: https://img.shields.io/badge/armhf-yes-green.svg
+[armv7-shield]: https://img.shields.io/badge/armv7-yes-green.svg
+[i386-shield]: https://img.shields.io/badge/i386-yes-green.svg

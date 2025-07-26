@@ -1,1 +1,1 @@
-# AICleaner v3 Testing Module
+"""Test package for AI Cleaner addon."""

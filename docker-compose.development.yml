@@ -1,0 +1,199 @@
+# Development Docker Compose for AICleaner v3 with Ollama
+# Development environment with hot-reload, debugging, and development tools
+
+version: '3.8'
+
+services:
+  # Ollama service for local LLM inference
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: aicleaner-ollama-dev
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/data/models
+      - ./scripts:/scripts:rw  # Read-write for development
+      - ./config:/config:rw
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      - OLLAMA_KEEP_ALIVE=5m  # Shorter keep-alive for development
+      - OLLAMA_DEBUG=1
+    networks:
+      - aicleaner_network
+    healthcheck:
+      test: ["/scripts/health-check.sh", "quick"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # AICleaner main application with development features
+  aicleaner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_FROM: python:3.11-alpine
+      target: builder  # Use builder stage for development tools
+    container_name: aicleaner-app-dev
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+      - "5678:5678"  # Debug port for remote debugging
+    volumes:
+      # Mount source code for hot-reload
+      - ./ai:/app/ai:rw
+      - ./core:/app/core:rw
+      - ./integrations:/app/integrations:rw
+      - ./gamification:/app/gamification:rw
+      - ./notifications:/app/notifications:rw
+      - ./rules:/app/rules:rw
+      - ./utils:/app/utils:rw
+      - ./mobile:/app/mobile:rw
+      - ./mqtt:/app/mqtt:rw
+      - ./tests:/app/tests:rw
+      - ./www:/app/www:rw
+      
+      # Configuration and data
+      - ./config.yaml:/app/config.yaml:rw
+      - ./config/development.yaml:/app/development.yaml:rw
+      - aicleaner_data:/data/aicleaner
+      - aicleaner_config:/config
+      - aicleaner_logs:/logs
+      
+      # Development tools
+      - ./.pytest_cache:/app/.pytest_cache:rw
+      - ./coverage_reports:/app/coverage_reports:rw
+    environment:
+      # Ollama Configuration
+      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_MODELS_PATH=/data/models
+      - OLLAMA_AUTO_DOWNLOAD=true
+      
+      # AICleaner Configuration
+      - AICLEANER_DATA_PATH=/data/aicleaner
+      - AICLEANER_LOG_LEVEL=DEBUG
+      - AICLEANER_PRIVACY_LEVEL=development
+      - AICLEANER_ENVIRONMENT=development
+      
+      # Development Settings
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - FLASK_ENV=development
+      - DEBUG=1
+      
+      # Home Assistant Integration (development)
+      - HA_TOKEN=${HA_TOKEN:-dev_token}
+      - HA_URL=${HA_URL:-http://homeassistant:8123}
+      
+      # Performance Settings (relaxed for development)
+      - MAX_MEMORY_USAGE=1024
+      - MAX_CPU_USAGE=50
+      - QUANTIZATION_LEVEL=8
+      
+      # Testing Configuration
+      - PYTEST_CURRENT_TEST=${PYTEST_CURRENT_TEST:-}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - aicleaner_network
+    command: >
+      sh -c "
+        echo 'Starting AICleaner in development mode...' &&
+        pip install -e . &&
+        python -m pytest tests/ --tb=short -v &&
+        echo 'Tests completed. Starting application...' &&
+        python aicleaner.py
+      "
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:8099', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Development database for testing (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: aicleaner-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aicleaner_network
+    profiles:
+      - testing
+
+  # Test runner service (optional)
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_FROM: python:3.11-alpine
+    container_name: aicleaner-tests
+    volumes:
+      - .:/app:rw
+      - test_results:/app/test_results
+    environment:
+      - PYTHONPATH=/app
+      - PYTEST_CURRENT_TEST=1
+      - AICLEANER_ENVIRONMENT=testing
+    working_dir: /app
+    command: >
+      sh -c "
+        echo 'Running comprehensive test suite...' &&
+        python -m pytest tests/ -v --cov=. --cov-report=html:/app/test_results/coverage --cov-report=term &&
+        echo 'Test suite completed.'
+      "
+    networks:
+      - aicleaner_network
+    profiles:
+      - testing
+
+  # Documentation server (optional)
+  docs:
+    image: nginx:alpine
+    container_name: aicleaner-docs-dev
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docs:/usr/share/nginx/html:ro
+      - ./README.md:/usr/share/nginx/html/README.md:ro
+    networks:
+      - aicleaner_network
+    profiles:
+      - docs
+
+# Named volumes for development data
+volumes:
+  ollama_models:
+    driver: local
+  aicleaner_data:
+    driver: local
+  aicleaner_config:
+    driver: local
+  aicleaner_logs:
+    driver: local
+  redis_data:
+    driver: local
+  test_results:
+    driver: local
+
+# Development network
+networks:
+  aicleaner_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

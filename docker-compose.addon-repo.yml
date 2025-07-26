@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  addon-repo:
+    image: nginx:alpine
+    container_name: addon-repo-server
+    volumes:
+      - ./addon-repository:/usr/share/nginx/html:ro
+    ports:
+      - "8124:80"
+    restart: unless-stopped

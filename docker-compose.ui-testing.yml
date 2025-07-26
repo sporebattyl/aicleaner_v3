@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Home Assistant Core for addon testing
+  homeassistant:
+    image: homeassistant/home-assistant:stable
+    container_name: ha-ui-test
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    volumes:
+      - ha_ui_config:/config
+      - ha_ui_share:/share
+      - ha_ui_media:/media
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - SUPERVISOR_TOKEN=test_supervisor_token_12345
+      - TZ=UTC
+    networks:
+      - ha_ui_test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Simplified Supervisor Mock for addon management
+  supervisor_mock:
+    image: nginx:alpine
+    container_name: supervisor-mock-ui-test
+    restart: unless-stopped
+    ports:
+      - "8099:80"
+    volumes:
+      - ./supervisor_mock_config:/usr/share/nginx/html:ro
+    networks:
+      - ha_ui_test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # AICleaner v3 Addon with Ingress
+  aicleaner_v3_ingress:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: aicleaner-addon-ui-test
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - addon_ui_data:/data
+      - addon_ui_config:/config
+      - ./test_data_ui/options.json:/data/options.json:ro
+    environment:
+      - DEBUG_MODE=true
+      - LOG_LEVEL=debug
+      - MQTT_HOST=localhost
+      - MQTT_PORT=1883
+      - CORE_SERVICE_URL=http://localhost:8000
+      - SUPERVISOR_TOKEN=test_supervisor_token_12345
+      - HASSIO_TOKEN=test_supervisor_token_12345
+    networks:
+      - ha_ui_test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  ha_ui_test:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.30.0.0/16"
+          gateway: "172.30.0.1"
+
+volumes:
+  ha_ui_config:
+    driver: local
+  ha_ui_share:
+    driver: local
+  ha_ui_media:
+    driver: local
+  addon_ui_data:
+    driver: local
+  addon_ui_config:
+    driver: local

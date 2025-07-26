@@ -38,6 +38,14 @@ options:
   # MQTT Discovery (automatically configured via Home Assistant services)
   mqtt_discovery_prefix: "homeassistant"
   
+  # Entity Selections (Basic Mode)
+  default_camera: ""
+  default_todo_list: ""
+  
+  # Zone Configuration (Advanced Mode - Optional)
+  enable_zones: false
+  zones: []
+  
   # Advanced options (optional)
   debug_mode: false
   auto_dashboard: true
@@ -53,6 +61,19 @@ schema:
   
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
+  
+  # Entity Selections (Basic Mode)
+  default_camera: "entity(camera)?"
+  default_todo_list: "entity(todo)?"
+  
+  # Zone Configuration (Advanced Mode)
+  enable_zones: "bool"
+  zones:
+    - name: "str"
+      camera_entity: "entity(camera)"
+      todo_list_entity: "entity(todo)"
+      check_interval_minutes: "int(1,1440)"
+      ignore_rules: ["str"]
   
   # Advanced options
   debug_mode: "bool"

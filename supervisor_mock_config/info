@@ -1,0 +1,25 @@
+{
+  "result": "ok",
+  "data": {
+    "version": "2024.06.0",
+    "version_latest": "2024.06.0",
+    "update_available": false,
+    "channel": "stable",
+    "arch": "amd64",
+    "supported": true,
+    "healthy": true,
+    "supervisor": "2024.06.0",
+    "docker": "24.0.0",
+    "addons": [
+      {
+        "name": "AI Cleaner v3 (Ingress)",
+        "slug": "aicleaner_v3_ingress",
+        "description": "Development version of AI Cleaner addon with ingress UI for testing",
+        "repository": "http://localhost:8124",
+        "version": "dev-0.1.0",
+        "installed": true,
+        "state": "started"
+      }
+    ]
+  }
+}
