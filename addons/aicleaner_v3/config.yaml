@@ -57,7 +57,7 @@ schema:
   
   # AI Provider API Keys (optional)
   primary_api_key: "password?"
-  backup_api_keys: ["password?"]
+  backup_api_keys: [password]
   
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
@@ -73,7 +73,7 @@ schema:
       camera_entity: "entity(camera)"
       todo_list_entity: "entity(todo)"
       check_interval_minutes: "int(1,1440)"
-      ignore_rules: ["str"]
+      ignore_rules: [str]
   
   # Advanced options
   debug_mode: "bool"
