@@ -37,6 +37,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Build ${{ matrix.arch }} addon
     needs: info
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     strategy:
       matrix:
         arch: ${{ fromJson(needs.info.outputs.architectures) }}
@@ -63,6 +68,11 @@ jobs:
     name: Publish addon
     needs: [info, build]
     if: github.event_name == 'release'
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
