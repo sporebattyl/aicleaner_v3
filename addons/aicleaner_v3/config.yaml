@@ -19,7 +19,7 @@ host_network: false
 privileged: []
 ingress: true
 ingress_port: 8080
-panel_icon: "mdi:robot-vacuum"
+panel_icon: "mdi:broom"
 panel_title: "AI Cleaner v3"
 map:
   - data:rw

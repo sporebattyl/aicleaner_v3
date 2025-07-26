@@ -1,0 +1,69 @@
+{
+  "name": "AICleaner V3",
+  "short_name": "AICleaner",
+  "description": "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#2196F3",
+  "background_color": "#E8E8E8",
+  "lang": "en",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "icons/logo-64.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logo-128.png", 
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logo-web-192.png",
+      "sizes": "192x192", 
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logo-256.png",
+      "sizes": "256x256",
+      "type": "image/png", 
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logo-web-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logo-circle.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/logo-transparent.png",
+      "sizes": "128x128", 
+      "type": "image/png",
+      "purpose": "monochrome"
+    }
+  ],
+  "categories": [
+    "utilities",
+    "productivity", 
+    "lifestyle"
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "AICleaner V3 Dashboard"
+    }
+  ]
+}
