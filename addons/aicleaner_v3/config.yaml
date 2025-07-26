@@ -63,15 +63,15 @@ schema:
   mqtt_discovery_prefix: "str"
   
   # Entity Selections (Basic Mode)
-  default_camera: "str?"
-  default_todo_list: "str?"
+  default_camera: "entity(camera)?"
+  default_todo_list: "entity(todo)?"
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"
   zones:
     - name: "str"
-      camera_entity: "str"
-      todo_list_entity: "str"
+      camera_entity: "entity(camera)"
+      todo_list_entity: "entity(todo)"
       check_interval_minutes: "int(1,1440)"
       ignore_rules: ["str"]
   
