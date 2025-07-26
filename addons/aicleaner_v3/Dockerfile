@@ -19,27 +19,23 @@ RUN apk add --no-cache \
     python3-dev
 
 # Install bashio for Home Assistant add-on integration
-RUN pip3 install --no-cache-dir --break-system-packages bashio
+RUN pip3 install --no-cache-dir bashio
 
-# Set up a non-root user for security
+# Create app user early
 RUN addgroup -S app && adduser -S -G app app
 
-# Set working directory
+# Set working directory and create directories with proper ownership
 WORKDIR /app
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
-
-# Copy the application source code
-COPY src/ ./src/
-
-# Copy and set permissions for run script
-COPY run.sh /
-RUN chmod +x /run.sh
-
-# Create data directories with proper permissions
 RUN mkdir -p /data /config && chown -R app:app /data /config /app
+
+# Copy requirements and install as root, then switch user
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code with proper ownership
+COPY --chown=app:app src/ ./src/
+COPY --chown=app:app run.sh /
+RUN chmod +x /run.sh
 
 # Switch to non-root user
 USER app

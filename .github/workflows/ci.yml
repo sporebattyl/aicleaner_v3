@@ -26,9 +26,9 @@ jobs:
         
     - name: Validate Home Assistant addon config
       run: |
-        if [ -f "addons/aicleaner_v3/config.json" ]; then
-          python -c "import json; json.load(open('addons/aicleaner_v3/config.json'))"
-          echo "✓ Home Assistant config.json is valid"
+        if [ -f "addons/aicleaner_v3/config.yaml" ]; then
+          python -c "import yaml; yaml.safe_load(open('addons/aicleaner_v3/config.yaml'))"
+          echo "✓ Home Assistant config.yaml is valid"
         fi
 
   test:

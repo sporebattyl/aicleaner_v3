@@ -57,23 +57,23 @@ schema:
   
   # AI Provider API Keys (optional)
   primary_api_key: "password?"
-  backup_api_keys: [password]
+  backup_api_keys: "[password]"
   
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
   
   # Entity Selections (Basic Mode)
-  default_camera: "match(^(camera\\.[a-zA-Z0-9_]+)?$)?"
-  default_todo_list: "match(^(todo\\.[a-zA-Z0-9_]+)?$)?"
+  default_camera: "str?"
+  default_todo_list: "str?"
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"
   zones:
     - name: "str"
-      camera_entity: "match(^camera\\.[a-zA-Z0-9_]+$)"
-      todo_list_entity: "match(^todo\\.[a-zA-Z0-9_]+$)"
+      camera_entity: "str"
+      todo_list_entity: "str"
       check_interval_minutes: "int(1,1440)"
-      ignore_rules: [str]
+      ignore_rules: "[str]"
   
   # Advanced options
   debug_mode: "bool"

@@ -16,6 +16,4 @@ labels:
   io.hass.version: "{version}"
   maintainer: "sporebattyl"
   
-codenotary:
-  signer: "notary@home-assistant.io"
-  base_image: "notary@home-assistant.io"
+# codenotary configuration removed for community addon compatibility
