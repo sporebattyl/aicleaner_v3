@@ -89,5 +89,4 @@ jobs:
         with:
           args: |
             --target ./addons/aicleaner_v3 \
-            --all \
-            --with-codenotary
+            --all
