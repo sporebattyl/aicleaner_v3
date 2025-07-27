@@ -61,7 +61,7 @@ jobs:
         with:
           args: |
             --target ./addons/aicleaner_v3 \
-            --generic ${{ matrix.arch }}
+            --${{ matrix.arch }}
 
   publish:
     runs-on: ubuntu-latest
