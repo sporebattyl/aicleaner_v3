@@ -31,7 +31,7 @@ jobs:
         id: info
         uses: home-assistant/actions/helpers/info@master
         with:
-          path: ./addons/aicleaner_v3
+          path: ./aicleaner_v3
 
   build:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
         uses: home-assistant/builder@master
         with:
           args: |
-            --target ./addons/aicleaner_v3 \
+            --target ./aicleaner_v3 \
             --${{ matrix.arch }}
 
   publish:
@@ -88,5 +88,5 @@ jobs:
         uses: home-assistant/builder@master
         with:
           args: |
-            --target ./addons/aicleaner_v3 \
+            --target ./aicleaner_v3 \
             --all

@@ -21,13 +21,13 @@ jobs:
       
     - name: Validate Docker configuration
       run: |
-        chmod +x scripts/validate-docker.sh
-        ./scripts/validate-docker.sh
+        chmod +x aicleaner_v3/scripts/validate-docker.sh
+        ./aicleaner_v3/scripts/validate-docker.sh
         
     - name: Validate Home Assistant addon config
       run: |
-        if [ -f "addons/aicleaner_v3/config.yaml" ]; then
-          python -c "import yaml; yaml.safe_load(open('addons/aicleaner_v3/config.yaml'))"
+        if [ -f "aicleaner_v3/config.yaml" ]; then
+          python -c "import yaml; yaml.safe_load(open('aicleaner_v3/config.yaml'))"
           echo "✓ Home Assistant config.yaml is valid"
         fi
 
@@ -52,17 +52,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r addons/aicleaner_v3/requirements.txt
+        pip install -r aicleaner_v3/requirements.txt
         pip install pytest pytest-asyncio pytest-cov
         
     - name: Run tests
       run: |
-        pytest tests/ --cov=addons/aicleaner_v3 --cov-report=xml --cov-report=term-missing
+        pytest tests/ --cov=aicleaner_v3 --cov-report=xml --cov-report=term-missing
         
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       if: matrix.python-version == '3.11'
       with:
-        file: ./addons/aicleaner_v3/coverage.xml
+        file: ./aicleaner_v3/coverage.xml
         flags: unittests
         name: codecov-umbrella

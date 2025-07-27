@@ -44,7 +44,7 @@ An intelligent Home Assistant add-on that uses AI to monitor your home cameras a
 Add this repository to your Home Assistant add-on store:
 
 ```
-https://github.com/sporebattyl/aicleaner_v3
+https://github.com/drewcifer/aicleaner_v3
 ```
 
 ### 2. Install the Add-on
@@ -375,7 +375,7 @@ tap_action:
 ### Local Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/sporebattyl/aicleaner_v3.git
+git clone https://github.com/drewcifer/aicleaner_v3.git
 cd aicleaner_v3
 
 # Build development image
@@ -439,12 +439,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 ### Getting Help
-- **📋 Issues**: [GitHub Issues](https://github.com/sporebattyl/aicleaner_v3/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/sporebattyl/aicleaner_v3/discussions)
+- **📋 Issues**: [GitHub Issues](https://github.com/drewcifer/aicleaner_v3/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/drewcifer/aicleaner_v3/discussions)
 - **🏠 Forum**: [Home Assistant Community](https://community.home-assistant.io/)
 
 ### Before Reporting Issues
-1. Check existing [issues](https://github.com/sporebattyl/aicleaner_v3/issues)
+1. Check existing [issues](https://github.com/drewcifer/aicleaner_v3/issues)
 2. Use configuration validation tool
 3. Review addon logs
 4. Test with minimal configuration
@@ -476,10 +476,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **🏠 Repository**: https://github.com/sporebattyl/aicleaner_v3
-- **📚 Documentation**: [Project Wiki](https://github.com/sporebattyl/aicleaner_v3/wiki)
-- **🐛 Bug Reports**: [Issue Tracker](https://github.com/sporebattyl/aicleaner_v3/issues)
-- **💡 Feature Requests**: [Discussions](https://github.com/sporebattyl/aicleaner_v3/discussions)
+- **🏠 Repository**: https://github.com/drewcifer/aicleaner_v3
+- **📚 Documentation**: [Project Wiki](https://github.com/drewcifer/aicleaner_v3/wiki)
+- **🐛 Bug Reports**: [Issue Tracker](https://github.com/drewcifer/aicleaner_v3/issues)
+- **💡 Feature Requests**: [Discussions](https://github.com/drewcifer/aicleaner_v3/discussions)
 
 ---
 
