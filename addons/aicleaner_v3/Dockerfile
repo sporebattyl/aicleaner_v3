@@ -12,8 +12,7 @@ RUN apk add --no-cache \
     py3-pip \
     curl
 
-# Install bashio for Home Assistant integration
-RUN pip3 install --no-cache-dir --break-system-packages bashio
+# bashio is pre-installed in Home Assistant base images
 
 # Create working directory
 WORKDIR /app
