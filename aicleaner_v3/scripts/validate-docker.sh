@@ -1,5 +1,6 @@
 #!/bin/bash
 # Docker configuration validation script for AICleaner v3
+# Validates Home Assistant addon Docker setup and related configurations
 
 set -euo pipefail
 
@@ -27,11 +28,11 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Function to validate Dockerfile syntax
+# Function to validate Home Assistant addon Dockerfile
 validate_dockerfile() {
     local dockerfile_path="$1"
     
-    log_info "Validating Dockerfile syntax: $dockerfile_path"
+    log_info "Validating Home Assistant addon Dockerfile: $dockerfile_path"
     
     # Check if file exists
     if [[ ! -f "$dockerfile_path" ]]; then
@@ -39,17 +40,16 @@ validate_dockerfile() {
         return 1
     fi
     
-    # Basic syntax validation
     local errors=0
     
-    # Check for required FROM statements
-    if ! grep -q "^FROM.*as builder" "$dockerfile_path"; then
-        log_error "Missing builder stage FROM statement"
+    # Check for required HA addon elements
+    if ! grep -q "ARG BUILD_FROM" "$dockerfile_path"; then
+        log_error "Missing ARG BUILD_FROM statement (required for HA addons)"
         ((errors++))
     fi
     
-    if ! grep -q "^FROM.*as production" "$dockerfile_path"; then
-        log_error "Missing production stage FROM statement"
+    if ! grep -q "FROM.*BUILD_FROM" "$dockerfile_path"; then
+        log_error "Missing FROM \${BUILD_FROM} statement"
         ((errors++))
     fi
     
@@ -58,30 +58,31 @@ validate_dockerfile() {
         log_warning "No WORKDIR specified"
     fi
     
-    # Check for EXPOSE
-    if ! grep -q "^EXPOSE 8000" "$dockerfile_path"; then
-        log_error "Missing EXPOSE 8000 statement"
+    # Check for CMD or ENTRYPOINT
+    if ! grep -q "^CMD\|^ENTRYPOINT" "$dockerfile_path"; then
+        log_error "Missing CMD or ENTRYPOINT statement"
         ((errors++))
     fi
     
-    # Check for CMD
-    if ! grep -q "^CMD" "$dockerfile_path"; then
-        log_error "Missing CMD statement"
-        ((errors++))
-    fi
-    
-    # Check for HEALTHCHECK
+    # Check for HEALTHCHECK (recommended for HA addons)
     if ! grep -q "^HEALTHCHECK" "$dockerfile_path"; then
-        log_warning "No HEALTHCHECK specified"
+        log_info "HEALTHCHECK found - good for monitoring"
+    else
+        log_warning "No HEALTHCHECK specified (recommended for HA addons)"
     fi
     
     # Check for security best practices
     if grep -q "^USER root" "$dockerfile_path"; then
-        log_warning "Found explicit USER root - consider non-root user"
+        log_warning "Found explicit USER root - consider non-root user if possible"
+    fi
+    
+    # Check for Python dependencies installation
+    if ! grep -q "pip.*install" "$dockerfile_path"; then
+        log_warning "No pip install found - ensure dependencies are installed"
     fi
     
     if [[ $errors -eq 0 ]]; then
-        log_success "Dockerfile syntax validation passed"
+        log_success "Dockerfile validation passed"
         return 0
     else
         log_error "Dockerfile validation failed with $errors errors"
@@ -100,30 +101,45 @@ validate_compose() {
         return 1
     fi
     
-    # Check for required services
-    local required_services=("aicleaner" "redis" "prometheus" "grafana")
     local errors=0
     
-    for service in "${required_services[@]}"; do
-        if ! grep -q "^  $service:" "$compose_file"; then
-            log_error "Missing required service: $service"
-            ((errors++))
-        fi
-    done
-    
-    # Check for networks
-    if ! grep -q "^networks:" "$compose_file"; then
-        log_warning "No networks defined"
+    # Check for services section
+    if ! grep -q "^services:" "$compose_file"; then
+        log_error "Missing services section"
+        ((errors++))
     fi
     
-    # Check for volumes
-    if ! grep -q "^volumes:" "$compose_file"; then
-        log_warning "No volumes defined"
+    # Check for aicleaner service
+    if ! grep -q "aicleaner:" "$compose_file"; then
+        log_warning "No aicleaner service found (checking for main app service)"
     fi
     
-    # Check for health checks
-    if ! grep -q "healthcheck:" "$compose_file"; then
-        log_warning "No health checks defined"
+    # Check for networks (good practice)
+    if grep -q "^networks:" "$compose_file"; then
+        log_success "Networks section found"
+    else
+        log_info "No custom networks defined (using default)"
+    fi
+    
+    # Check for volumes (good practice)
+    if grep -q "^volumes:" "$compose_file"; then
+        log_success "Volumes section found"
+    else
+        log_info "No named volumes defined"
+    fi
+    
+    # Check for health checks in compose
+    if grep -q "healthcheck:" "$compose_file"; then
+        log_success "Health checks found in compose file"
+    else
+        log_warning "No health checks defined in compose"
+    fi
+    
+    # Check for restart policies
+    if grep -q "restart:" "$compose_file"; then
+        log_success "Restart policies found"
+    else
+        log_warning "No restart policies defined"
     fi
     
     if [[ $errors -eq 0 ]]; then
@@ -142,114 +158,186 @@ validate_dockerignore() {
     log_info "Validating .dockerignore: $dockerignore_path"
     
     if [[ ! -f "$dockerignore_path" ]]; then
-        log_warning ".dockerignore not found - build context may be large"
-        return 0
+        log_error ".dockerignore not found - build context may be large"
+        return 1
     fi
     
-    # Check for common patterns
-    local important_patterns=(".git/" "*.md" "__pycache__/" "*.pyc" ".pytest_cache/")
-    local warnings=0
+    # Check for common patterns that should be ignored
+    local important_patterns=(".git/" "*.md" "__pycache__/" "*.pyc" ".pytest_cache/" "tests/" ".github/")
+    local missing=0
     
     for pattern in "${important_patterns[@]}"; do
         if ! grep -q "$pattern" "$dockerignore_path"; then
             log_warning "Consider adding pattern to .dockerignore: $pattern"
-            ((warnings++))
+            ((missing++))
         fi
     done
     
-    log_success ".dockerignore validation completed with $warnings suggestions"
+    if [[ $missing -eq 0 ]]; then
+        log_success ".dockerignore validation passed - all recommended patterns found"
+    else
+        log_info ".dockerignore validation completed with $missing suggestions"
+    fi
+    
     return 0
 }
 
-# Function to validate build configuration
+# Function to validate build configuration for HA addon
 validate_build_config() {
     local build_yaml="$1"
     
-    log_info "Validating build configuration: $build_yaml"
+    log_info "Validating Home Assistant addon build configuration: $build_yaml"
     
     if [[ ! -f "$build_yaml" ]]; then
-        log_warning "build.yaml not found - multi-arch builds may not work"
+        log_warning "build.yaml not found - multi-arch builds may not work for HA addon"
         return 0
     fi
     
-    # Check for required architectures
-    local required_archs=("amd64" "aarch64" "armv7")
-    local errors=0
+    # Check for HA addon specific architectures
+    local ha_archs=("amd64" "aarch64" "armv7")
+    local missing_archs=0
     
-    for arch in "${required_archs[@]}"; do
-        if ! grep -q "$arch:" "$build_yaml"; then
-            log_error "Missing architecture in build.yaml: $arch"
-            ((errors++))
+    for arch in "${ha_archs[@]}"; do
+        if ! grep -q "$arch" "$build_yaml"; then
+            log_warning "Architecture not found in build.yaml: $arch"
+            ((missing_archs++))
         fi
     done
     
-    if [[ $errors -eq 0 ]]; then
+    # Check for build_from section (HA addon specific)
+    if grep -q "build_from:" "$build_yaml"; then
+        log_success "build_from section found (HA addon compatible)"
+    else
+        log_warning "No build_from section found (may be needed for HA addon)"
+    fi
+    
+    if [[ $missing_archs -eq 0 ]]; then
         log_success "Build configuration validation passed"
         return 0
     else
-        log_error "Build configuration validation failed with $errors errors"
-        return 1
+        log_info "Build configuration validation completed with $missing_archs missing architectures"
+        return 0
     fi
 }
 
-# Function to check file sizes
+# Function to check file sizes in build context
 check_file_sizes() {
-    log_info "Checking configuration file sizes..."
+    log_info "Checking build context file sizes..."
     
     local large_files=()
+    local total_size=0
     
     # Check for large files that shouldn't be in build context
     while IFS= read -r -d '' file; do
         local size
-        size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo 0)
+        size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+        total_size=$((total_size + size))
         if [[ $size -gt 10485760 ]]; then  # 10MB
             large_files+=("$file ($(( size / 1048576 ))MB)")
         fi
     done < <(find . -type f -not -path "./.git/*" -not -path "./data/*" -not -path "./logs/*" -print0 2>/dev/null)
     
+    # Convert total size to MB for display
+    local total_mb=$((total_size / 1048576))
+    
+    log_info "Total build context size: ${total_mb}MB"
+    
     if [[ ${#large_files[@]} -gt 0 ]]; then
         log_warning "Large files found in build context:"
         printf '  %s\n' "${large_files[@]}"
-        log_warning "Consider adding these to .dockerignore"
+        log_warning "Consider adding these to .dockerignore to reduce build time"
     else
-        log_success "No large files found in build context"
+        log_success "No excessively large files found in build context"
+    fi
+    
+    # Warn if build context is very large
+    if [[ $total_mb -gt 100 ]]; then
+        log_warning "Build context is quite large (${total_mb}MB) - consider optimizing .dockerignore"
     fi
 }
 
 # Function to validate requirements.txt
 validate_requirements() {
-    local req_file="aicleaner_v3/requirements.txt"
+    local req_file="requirements.txt"
     
     log_info "Validating requirements.txt"
     
     if [[ ! -f "$req_file" ]]; then
-        log_error "requirements.txt not found: $req_file"
+        log_error "requirements.txt not found in current directory"
         return 1
     fi
     
     # Check for version pinning
     local unpinned=0
+    local total_deps=0
+    
     while IFS= read -r line; do
-        if [[ $line =~ ^[a-zA-Z] ]] && [[ ! $line =~ "[=><]" ]]; then
-            log_warning "Unpinned dependency: $line"
-            ((unpinned++))
+        # Skip comments and empty lines
+        if [[ $line =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+            continue
+        fi
+        
+        # Check if it's a dependency line
+        if [[ $line =~ ^[a-zA-Z0-9_-]+ ]]; then
+            ((total_deps++))
+            if [[ ! $line =~ [=\>\<] ]]; then
+                log_warning "Unpinned dependency: $line"
+                ((unpinned++))
+            fi
         fi
     done < "$req_file"
+    
+    log_info "Found $total_deps dependencies"
     
     if [[ $unpinned -eq 0 ]]; then
         log_success "All dependencies are properly pinned"
     else
-        log_warning "$unpinned dependencies are not pinned"
+        log_warning "$unpinned out of $total_deps dependencies are not pinned"
     fi
     
     return 0
+}
+
+# Function to validate overall Docker setup
+validate_docker_setup() {
+    log_info "Performing basic Docker setup validation..."
+    
+    # Check if we can parse Dockerfile without Docker
+    if command -v docker &> /dev/null; then
+        log_info "Docker is available - could perform advanced validation"
+    else
+        log_warning "Docker not available - performing syntax-only validation"
+    fi
+    
+    # Check for config.yaml (HA addon requirement)
+    if [[ -f "config.yaml" ]]; then
+        log_success "config.yaml found (required for HA addon)"
+    else
+        log_warning "config.yaml not found (required for HA addon publication)"
+    fi
+    
+    # Check for run.sh script (common HA addon pattern)
+    if [[ -f "run.sh" ]]; then
+        log_success "run.sh script found"
+        if [[ -x "run.sh" ]]; then
+            log_success "run.sh is executable"
+        else
+            log_warning "run.sh is not executable"
+        fi
+    else
+        log_info "No run.sh script found (not required but common for HA addons)"
+    fi
 }
 
 # Main validation function
 main() {
     local validation_errors=0
     
-    log_info "Starting Docker configuration validation for AICleaner v3"
+    log_info "Starting Docker configuration validation for AICleaner v3 (Home Assistant Addon)"
+    echo ""
+    
+    # Validate overall Docker setup
+    validate_docker_setup
     echo ""
     
     # Validate Dockerfile
@@ -258,21 +346,27 @@ main() {
     fi
     echo ""
     
-    # Validate docker-compose files
-    local compose_files=("docker-compose.yml" "docker-compose.prod.yml" "docker-compose.dev.yml")
-    for compose_file in "${compose_files[@]}"; do
+    # Validate docker-compose files (if any exist)
+    local compose_files_found=false
+    for compose_file in docker-compose*.yml; do
         if [[ -f "$compose_file" ]]; then
+            compose_files_found=true
             if ! validate_compose "$compose_file"; then
                 ((validation_errors++))
             fi
-        else
-            log_warning "Docker Compose file not found: $compose_file"
+            echo ""
         fi
-        echo ""
     done
     
+    if [[ "$compose_files_found" == false ]]; then
+        log_info "No docker-compose files found (not required for HA addon)"
+        echo ""
+    fi
+    
     # Validate .dockerignore
-    validate_dockerignore ".dockerignore"
+    if ! validate_dockerignore ".dockerignore"; then
+        ((validation_errors++))
+    fi
     echo ""
     
     # Validate build configuration
@@ -280,7 +374,9 @@ main() {
     echo ""
     
     # Validate requirements
-    validate_requirements
+    if ! validate_requirements; then
+        ((validation_errors++))
+    fi
     echo ""
     
     # Check file sizes
@@ -289,14 +385,14 @@ main() {
     
     # Summary
     if [[ $validation_errors -eq 0 ]]; then
-        log_success "All Docker configuration validations passed!"
+        log_success "All critical Docker configuration validations passed!"
         echo ""
-        log_info "Ready for Docker build and deployment"
+        log_info "Docker configuration is ready for Home Assistant addon deployment"
         return 0
     else
-        log_error "Docker configuration validation failed with $validation_errors errors"
+        log_error "Docker configuration validation failed with $validation_errors critical errors"
         echo ""
-        log_info "Please fix the errors before building"
+        log_info "Please fix the critical errors before proceeding with deployment"
         return 1
     fi
 }
