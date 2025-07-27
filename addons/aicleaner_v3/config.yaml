@@ -1,5 +1,5 @@
 name: "AICleaner V3"
-version: "1.0.8"
+version: "1.0.9"
 slug: "aicleaner_v3"
 description: "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration"
 url: "https://github.com/sporebattyl/aicleaner_v3/tree/main/addons/aicleaner_v3"
@@ -57,7 +57,7 @@ schema:
   
   # AI Provider API Keys (optional)
   primary_api_key: "password?"
-  backup_api_keys: "[password]"
+  backup_api_keys: "list(password)?"
   
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
@@ -73,7 +73,7 @@ schema:
       camera_entity: "str"
       todo_list_entity: "str"
       check_interval_minutes: "int(1,1440)"
-      ignore_rules: "[str]"
+      ignore_rules: "list(str)?"
   
   # Advanced options
   debug_mode: "bool"

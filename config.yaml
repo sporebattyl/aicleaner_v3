@@ -1,3 +1,12 @@
 name: "AICleaner V3 Add-ons"
+description: "AI-powered cleaning task management add-ons for Home Assistant"
+version: "1.0.9"
+slug: "aicleaner_v3_addons"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
 url: "https://github.com/sporebattyl/aicleaner_v3"
 maintainer: "sporebattyl"
