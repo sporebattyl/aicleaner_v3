@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bashio
 
 # ==============================================================================
 # AICleaner V3 Add-on Startup Script
