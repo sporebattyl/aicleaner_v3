@@ -4,20 +4,20 @@ FROM ${BUILD_FROM}
 # Set shell to bash with error handling
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install build dependencies and runtime packages
+# Install runtime packages and Alpine Python packages to avoid C extension compilation
 RUN apk add --no-cache \
     bash \
     jq \
     python3 \
     py3-pip \
     curl \
+    py3-cryptography \
+    py3-psutil \
+    py3-aiohttp \
     && apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     libffi-dev \
-    openssl-dev \
-    cargo \
-    rust \
     python3-dev
 
 # bashio is pre-installed in Home Assistant base images
