@@ -18,7 +18,8 @@ RUN apk add --no-cache \
     linux-headers \
     python3-dev
 
-# Note: bashio is pre-installed in Home Assistant base images
+# Install bashio explicitly (may not be pre-installed in all base images)
+RUN pip install --no-cache-dir bashio
 
 # Create app user early
 RUN addgroup -S app && adduser -S -G app app
@@ -30,14 +31,13 @@ RUN mkdir -p /data /config && chown -R app:app /data /config /app
 # Copy requirements and install as root, then switch user
 COPY requirements.txt .
 
-# Handle architecture-specific installation, especially for ARM builds
+# Install Python dependencies with ARM optimizations where needed
 RUN echo "Building from base image: $BUILD_FROM" && \
     case "$BUILD_FROM" in \
         *armv7*|*armhf*) \
-            echo "Installing for ARM architecture with optimizations..." && \
+            echo "Installing for ARM architecture with binary packages..." && \
             apk add --no-cache py3-cryptography py3-psutil && \
-            pip install --no-cache-dir --prefer-binary --no-build-isolation \
-                --only-binary=cryptography,psutil -r requirements.txt ;; \
+            pip install --no-cache-dir --prefer-binary --only-binary=cryptography,psutil -r requirements.txt ;; \
         *) \
             echo "Installing for standard architecture..." && \
             pip install --no-cache-dir -r requirements.txt ;; \
