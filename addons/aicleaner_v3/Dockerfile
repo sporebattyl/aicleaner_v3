@@ -18,8 +18,7 @@ RUN apk add --no-cache \
     linux-headers \
     python3-dev
 
-# Install bashio for Home Assistant add-on integration
-RUN pip3 install --no-cache-dir bashio
+# Note: bashio is pre-installed in Home Assistant base images
 
 # Create app user early
 RUN addgroup -S app && adduser -S -G app app

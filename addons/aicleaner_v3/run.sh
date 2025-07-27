@@ -1,11 +1,8 @@
-#!/bin/bash
+#!/usr/bin/with-contenv bashio
 
 # ==============================================================================
 # AICleaner V3 Add-on Startup Script
 # ==============================================================================
-
-# Source bashio for Home Assistant add-on functionality
-source /usr/lib/bashio/bashio.sh
 
 bashio::log.info "Starting AICleaner V3 add-on..."
 
