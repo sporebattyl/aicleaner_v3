@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
 FROM ${BUILD_FROM}
 
 # Install bash first (needed for shell setting)
@@ -7,7 +7,7 @@ RUN apk add --no-cache bash
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install system dependencies including build tools for Python packages
+# Install Python and system dependencies including build tools for Python packages
 RUN apk add --no-cache \
     jq \
     python3 \
