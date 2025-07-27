@@ -4,13 +4,21 @@ FROM ${BUILD_FROM}
 # Set shell to bash with error handling
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install Python and essential packages
+# Install build dependencies and runtime packages
 RUN apk add --no-cache \
     bash \
     jq \
     python3 \
     py3-pip \
-    curl
+    curl \
+    && apk add --no-cache --virtual .build-deps \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    rust \
+    python3-dev
 
 # bashio is pre-installed in Home Assistant base images
 
@@ -19,7 +27,9 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages --upgrade pip setuptools wheel && \
+    pip3 install --no-cache-dir --break-system-packages -r requirements.txt && \
+    apk del .build-deps
 
 # Copy source code
 COPY src/ ./src/
