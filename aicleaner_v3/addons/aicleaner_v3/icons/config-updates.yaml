@@ -1,0 +1,60 @@
+# Home Assistant Addon Configuration Updates for Icon Integration
+
+# CURRENT CONFIG.YAML UPDATES NEEDED:
+
+# 1. PANEL ICON IMPROVEMENT
+# Current: panel_icon: "mdi:robot-vacuum"
+# Recommended alternatives (choose one):
+panel_icon: "mdi:broom"           # More specific to cleaning
+# panel_icon: "mdi:spray-bottle"  # Alternative cleaning icon  
+# panel_icon: "mdi:robot-mop"     # Robotic cleaning specific
+# panel_icon: "mdi:auto-fix"      # AI/automation concept
+
+# 2. WEB UI INTEGRATION (for ingress)
+# Add to options section:
+options:
+  # ... existing options ...
+  web_ui_theme: "auto"  # auto, light, dark
+  custom_branding: true  # Enable custom icon usage
+
+# 3. INGRESS IMPROVEMENTS
+# Current ingress settings are good, but ensure proper icon loading:
+ingress: true
+ingress_port: 8080
+ingress_entry: "/"
+
+# ADDITIONAL RECOMMENDED SECTIONS:
+
+# Add app manifest support for PWA functionality
+web_manifest:
+  name: "AICleaner V3"
+  short_name: "AICleaner"
+  description: "AI-powered cleaning task management"
+  theme_color: "#2196F3"
+  background_color: "#E8E8E8"
+  display: "standalone"
+  icons:
+    - src: "icons/logo-web-192.png"
+      sizes: "192x192"
+      type: "image/png"
+    - src: "icons/logo-web-512.png"
+      sizes: "512x512"  
+      type: "image/png"
+
+# Icon file references (for documentation)
+icons:
+  primary: "logo.png"        # Keep existing 128x128 as primary
+  favicon: "icons/favicon.ico"
+  sizes:
+    small: "icons/logo-64.png"
+    medium: "icons/logo-128.png"  
+    large: "icons/logo-256.png"
+    xlarge: "icons/logo-512.png"
+  themes:
+    dark: "icons/logo-dark.png"
+    light: "icons/logo-light.png"
+    transparent: "icons/logo-transparent.png"
+  shapes:
+    circle: "icons/logo-circle.png"
+    padded: "icons/logo-square-padded.png"
+    panel: "icons/logo-panel.png"
