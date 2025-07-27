@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19
+ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # Install bash first (needed for shell setting)
@@ -31,7 +31,6 @@ RUN mkdir -p /data /config && chown -R app:app /data /config /app
 COPY requirements.txt .
 
 # Handle architecture-specific installation, especially for ARM builds
-ARG BUILD_FROM
 RUN echo "Building from base image: $BUILD_FROM" && \
     case "$BUILD_FROM" in \
         *armv7*|*armhf*) \
