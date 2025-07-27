@@ -98,3 +98,16 @@ config.yaml.enterprise_backup
 
 # Deletion Review directory  
 Deletion Review/
+Deletion_Review/
+
+# Development files that could conflict with Home Assistant addon detection
+development/
+dev/
+**/development/
+**/dev/
+
+# Additional config files that could cause addon duplication
+config.yaml
+config.json
+!addons/*/config.yaml
+!addons/*/config.json
