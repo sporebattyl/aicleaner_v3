@@ -1,3 +1,6 @@
 name: "AICleaner V3 Repository"
 url: "https://github.com/sporebattyl/aicleaner_v3"
 maintainer: "sporebattyl"
+addons:
+  aicleaner_v3:
+    location: aicleaner_v3
