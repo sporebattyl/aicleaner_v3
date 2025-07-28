@@ -32,5 +32,4 @@ jobs:
           args: |
             --target ./aicleaner_v3 \
             --amd64 \
-            --docker-hub ${{ env.REGISTRY }} \
-            --image aicleaner_v3
+            --docker-hub ${{ env.REGISTRY }}/${{ github.repository_owner }}
