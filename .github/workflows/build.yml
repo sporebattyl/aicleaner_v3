@@ -5,6 +5,7 @@ on:
     branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -26,10 +27,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push addon
         uses: home-assistant/builder@master
         with:
           args: |
             --target ./aicleaner_v3 \
-            --amd64 \
+            --all \
             --docker-hub ${{ env.REGISTRY }}/${{ github.repository_owner }}
