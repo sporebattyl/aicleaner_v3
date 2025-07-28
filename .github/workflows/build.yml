@@ -33,7 +33,7 @@ jobs:
         id: info
         uses: home-assistant/actions/helpers/info@master
         with:
-          path: ./aicleaner_v3/addons/aicleaner_v3
+          path: ./aicleaner_v3
 
   validate-build:
     runs-on: ubuntu-latest
@@ -45,7 +45,7 @@ jobs:
 
       - name: Validate Dockerfile
         run: |
-          cd aicleaner_v3/addons/aicleaner_v3
+          cd aicleaner_v3
           if [ ! -f "Dockerfile" ]; then
             echo "❌ Dockerfile not found"
             exit 1
@@ -62,7 +62,7 @@ jobs:
 
       - name: Validate build requirements
         run: |
-          cd aicleaner_v3/addons/aicleaner_v3
+          cd aicleaner_v3
           
           # Check for requirements.txt
           if [ ! -f "requirements.txt" ]; then
@@ -130,7 +130,7 @@ jobs:
         uses: home-assistant/builder@master
         with:
           args: |
-            --target ./aicleaner_v3/addons/aicleaner_v3 \
+            --target ./aicleaner_v3 \
             --${{ matrix.arch }} \
             --docker-hub ${{ env.REGISTRY }} \
             --image "${{ needs.info.outputs.slug }}" \
@@ -159,7 +159,7 @@ jobs:
 
       - name: Build test image
         run: |
-          cd aicleaner_v3/addons/aicleaner_v3
+          cd aicleaner_v3
           docker buildx build \
             --platform linux/${{ matrix.arch }} \
             --load \
@@ -215,7 +215,7 @@ jobs:
       - name: Create GitHub release assets
         if: github.event_name == 'release'
         run: |
-          cd aicleaner_v3/addons/aicleaner_v3
+          cd aicleaner_v3
           
           # Create release package
           tar -czf "../aicleaner_v3-${{ needs.info.outputs.version }}.tar.gz" \
