@@ -1,9 +1,0 @@
-{
-  "log_level": "info",
-  "device_id": "aicleaner_v3_test",
-  "primary_api_key": "test-gemini-api-key-123",
-  "backup_api_keys": ["backup-key-1", "backup-key-2"],
-  "mqtt_discovery_prefix": "homeassistant",
-  "debug_mode": true,
-  "auto_dashboard": true
-}

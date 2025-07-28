@@ -30,7 +30,7 @@ jobs:
         uses: home-assistant/builder@master
         with:
           args: |
-            --target aicleaner_v3 \
+            --target ./aicleaner_v3 \
             --amd64 \
             --docker-hub ${{ env.REGISTRY }} \
             --image aicleaner_v3
