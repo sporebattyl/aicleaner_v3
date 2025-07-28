@@ -35,7 +35,8 @@ RUN pip3 install --no-cache-dir --break-system-packages --upgrade pip setuptools
 
 # Copy source code
 COPY src/ ./src/
-COPY config/ ./config/ 2>/dev/null || true
+
+# Copy startup script
 COPY run.sh /
 RUN chmod +x /run.sh
 
