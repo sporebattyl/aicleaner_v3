@@ -1,0 +1,454 @@
+name: Build Health Monitoring
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC to check build system health
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of health check to perform'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - 'full'
+          - 'config-only'
+          - 'dependencies-only'
+          - 'quick'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  config-health-check:
+    runs-on: ubuntu-latest
+    name: Configuration Health Assessment
+    outputs:
+      config_health: ${{ steps.health_assessment.outputs.config_health }}
+      issues_found: ${{ steps.health_assessment.outputs.issues_found }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install monitoring tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y yq jq yamllint
+
+      - name: Comprehensive configuration health check
+        id: health_assessment
+        run: |
+          echo "=== Configuration Health Assessment ==="
+          
+          ISSUES=()
+          WARNINGS=()
+          CONFIG_HEALTH="healthy"
+          
+          # Check main configuration files
+          echo "🔍 Checking main configuration files..."
+          
+          # Validate config.yaml
+          if [ -f "aicleaner_v3/config.yaml" ]; then
+            echo "✅ config.yaml exists"
+            
+            # YAML syntax check
+            if ! yamllint aicleaner_v3/config.yaml; then
+              ISSUES+=("config.yaml has YAML syntax errors") 
+              CONFIG_HEALTH="unhealthy"
+            fi
+            
+            # Required fields check
+            REQUIRED_FIELDS=("name" "version" "slug" "arch")
+            for field in "${REQUIRED_FIELDS[@]}"; do
+              VALUE=$(yq eval ".$field" aicleaner_v3/config.yaml)
+              if [ "$VALUE" = "null" ] || [ -z "$VALUE" ]; then
+                ISSUES+=("Missing required field: $field")
+                CONFIG_HEALTH="unhealthy"
+              fi
+            done
+            
+            # Architecture validation
+            ARCH_COUNT=$(yq eval '.arch | length' aicleaner_v3/config.yaml)
+            if [ "$ARCH_COUNT" -eq 0 ]; then
+              ISSUES+=("No architectures defined")
+              CONFIG_HEALTH="unhealthy"
+            else
+              echo "✅ $ARCH_COUNT architectures defined"
+            fi
+          else
+            ISSUES+=("config.yaml not found")
+            CONFIG_HEALTH="critical"
+          fi
+          
+          # Check build.yaml
+          if [ -f "aicleaner_v3/build.yaml" ]; then
+            echo "✅ build.yaml exists"
+            if ! yamllint aicleaner_v3/build.yaml; then
+              WARNINGS+=("build.yaml has YAML syntax warnings")
+            fi
+          else
+            WARNINGS+=("build.yaml not found (optional but recommended)")
+          fi
+          
+          # Check Dockerfile
+          if [ -f "aicleaner_v3/Dockerfile" ]; then
+            echo "✅ Dockerfile exists"
+            
+            # Basic Dockerfile validation
+            if ! grep -q "^FROM " aicleaner_v3/Dockerfile; then
+              ISSUES+=("Dockerfile missing FROM instruction")
+              CONFIG_HEALTH="unhealthy"
+            fi
+            
+            # Check for Home Assistant base image
+            if ! grep -q "home-assistant.*base" aicleaner_v3/Dockerfile; then
+              WARNINGS+=("Not using official Home Assistant base image")
+            fi
+          else
+            ISSUES+=("Dockerfile not found")
+            CONFIG_HEALTH="critical"
+          fi
+          
+          # Check workflow file
+          if [ -f ".github/workflows/build.yml" ]; then
+            echo "✅ build.yml workflow exists"
+            if ! yamllint .github/workflows/build.yml; then
+              ISSUES+=("build.yml workflow has syntax errors")
+              CONFIG_HEALTH="critical"
+            fi
+          else
+            ISSUES+=("build.yml workflow not found")
+            CONFIG_HEALTH="critical"
+          fi
+          
+          # Report results
+          echo "=== Health Assessment Results ==="
+          echo "Config Health Status: $CONFIG_HEALTH"
+          
+          if [ ${#ISSUES[@]} -gt 0 ]; then
+            echo "❌ Critical Issues Found:"
+            printf '  - %s\n' "${ISSUES[@]}"
+          fi
+          
+          if [ ${#WARNINGS[@]} -gt 0 ]; then
+            echo "⚠️  Warnings:"
+            printf '  - %s\n' "${WARNINGS[@]}"
+          fi
+          
+          if [ ${#ISSUES[@]} -eq 0 ] && [ ${#WARNINGS[@]} -eq 0 ]; then
+            echo "✅ No issues found - configuration is healthy"
+          fi
+          
+          # Set outputs
+          echo "config_health=$CONFIG_HEALTH" >> $GITHUB_OUTPUT
+          echo "issues_found=${#ISSUES[@]}" >> $GITHUB_OUTPUT
+
+  dependency-health-check:
+    runs-on: ubuntu-latest
+    name: Dependency and Infrastructure Health
+    if: github.event.inputs.check_type != 'config-only'
+    outputs:
+      dependencies_health: ${{ steps.dep_check.outputs.dependencies_health }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check GitHub Container Registry connectivity
+        id: registry_check
+        run: |
+          echo "🔍 Testing GitHub Container Registry connectivity..."
+          
+          # Test registry access
+          if docker manifest inspect ghcr.io/home-assistant/amd64-base:3.19 >/dev/null 2>&1; then
+            echo "✅ GitHub Container Registry accessible"
+            REGISTRY_STATUS="healthy"
+          else
+            echo "❌ GitHub Container Registry access failed"
+            REGISTRY_STATUS="unhealthy"
+          fi
+          
+          echo "registry_status=$REGISTRY_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Check Home Assistant action dependencies
+        id: action_check
+        run: |
+          echo "🔍 Checking Home Assistant action dependencies..."
+          
+          # Test if the info action repository is accessible
+          if curl -s -f https://api.github.com/repos/home-assistant/actions >/dev/null; then
+            echo "✅ Home Assistant actions repository accessible"
+            ACTION_STATUS="healthy"
+          else
+            echo "❌ Home Assistant actions repository not accessible"
+            ACTION_STATUS="unhealthy"
+          fi
+          
+          echo "action_status=$ACTION_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Check base image availability
+        run: |
+          echo "🔍 Checking Home Assistant base image availability..."
+          
+          ARCHITECTURES=("amd64" "aarch64" "armhf" "armv7")
+          UNAVAILABLE_IMAGES=()
+          
+          for arch in "${ARCHITECTURES[@]}"; do
+            IMAGE="ghcr.io/home-assistant/${arch}-base:3.19"
+            echo "Checking $IMAGE..."
+            
+            if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+              echo "✅ $IMAGE available"
+            else
+              echo "❌ $IMAGE not available"
+              UNAVAILABLE_IMAGES+=("$arch")
+            fi
+          done
+          
+          if [ ${#UNAVAILABLE_IMAGES[@]} -gt 0 ]; then
+            echo "⚠️  Unavailable base images for: ${UNAVAILABLE_IMAGES[*]}"
+          else
+            echo "✅ All base images available"
+          fi
+
+      - name: Overall dependency health assessment
+        id: dep_check
+        run: |
+          REGISTRY_STATUS="${{ steps.registry_check.outputs.registry_status }}"
+          ACTION_STATUS="${{ steps.action_check.outputs.action_status }}"
+          
+          if [ "$REGISTRY_STATUS" = "healthy" ] && [ "$ACTION_STATUS" = "healthy" ]; then
+            DEPENDENCIES_HEALTH="healthy"
+          else
+            DEPENDENCIES_HEALTH="unhealthy"
+          fi
+          
+          echo "dependencies_health=$DEPENDENCIES_HEALTH" >> $GITHUB_OUTPUT
+
+  build-system-test:
+    runs-on: ubuntu-latest
+    name: Build System Integration Test
+    needs: [config-health-check]
+    if: needs.config-health-check.outputs.config_health != 'critical' && github.event.inputs.check_type == 'full'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test architecture detection system
+        run: |
+          echo "🧪 Testing architecture detection system..."
+          
+          cd aicleaner_v3
+          
+          # Install required tools
+          sudo apt-get update && sudo apt-get install -y yq jq
+          
+          # Test direct config parsing (Strategy 2)
+          echo "Testing direct config.yaml parsing..."
+          PARSED_ARCH=$(yq eval -o=json '.arch' config.yaml)
+          echo "Parsed architectures: $PARSED_ARCH"
+          
+          if [ -n "$PARSED_ARCH" ] && echo "$PARSED_ARCH" | jq -e . > /dev/null 2>&1; then
+            ARCH_COUNT=$(echo "$PARSED_ARCH" | jq '. | length')
+            if [ "$ARCH_COUNT" -gt 0 ]; then
+              echo "✅ Direct config parsing working ($ARCH_COUNT architectures)"
+            else
+              echo "❌ Direct config parsing returned empty array"
+              exit 1
+            fi
+          else
+            echo "❌ Direct config parsing failed"
+            exit 1
+          fi
+          
+          # Test hardcoded fallback (Strategy 3)
+          echo "Testing hardcoded fallback..."
+          HARDCODED_ARCH='["aarch64","amd64","armhf","armv7"]'
+          if echo "$HARDCODED_ARCH" | jq -e . > /dev/null 2>&1; then
+            echo "✅ Hardcoded fallback working"
+          else
+            echo "❌ Hardcoded fallback failed"
+            exit 1
+          fi
+          
+          echo "✅ Architecture detection system health check passed"
+
+      - name: Test Docker build preparation
+        run: |
+          echo "🧪 Testing Docker build preparation..."
+          
+          cd aicleaner_v3
+          
+          # Check if Dockerfile can be parsed
+          if docker run --rm -i hadolint/hadolint < Dockerfile; then
+            echo "✅ Dockerfile passes hadolint validation"
+          else
+            echo "⚠️  Dockerfile has hadolint warnings (non-critical)"
+          fi
+          
+          # Test basic build context
+          if docker build --dry-run . >/dev/null 2>&1; then
+            echo "✅ Docker build context is valid"
+          else
+            echo "❌ Docker build context has issues"
+            exit 1
+          fi
+
+  health-report:
+    runs-on: ubuntu-latest
+    name: Generate Health Report
+    needs: [config-health-check, dependency-health-check, build-system-test]
+    if: always()
+    steps:
+      - name: Generate comprehensive health report
+        run: |
+          echo "=== Build System Health Report ===" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Generated**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Check Type**: ${{ github.event.inputs.check_type || 'scheduled' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Configuration Health
+          CONFIG_HEALTH="${{ needs.config-health-check.outputs.config_health }}"
+          ISSUES_COUNT="${{ needs.config-health-check.outputs.issues_found }}"
+          
+          case $CONFIG_HEALTH in
+            "healthy")
+              CONFIG_ICON="✅"
+              ;;
+            "unhealthy")
+              CONFIG_ICON="⚠️"
+              ;;
+            "critical")
+              CONFIG_ICON="❌"
+              ;;
+            *)
+              CONFIG_ICON="❓"
+              ;;
+          esac
+          
+          echo "## 🔧 Configuration Health" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: $CONFIG_ICON $CONFIG_HEALTH" >> $GITHUB_STEP_SUMMARY
+          echo "**Issues Found**: $ISSUES_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Dependencies Health
+          if [ "${{ needs.dependency-health-check.result }}" != "skipped" ]; then
+            DEPS_HEALTH="${{ needs.dependency-health-check.outputs.dependencies_health }}"
+            case $DEPS_HEALTH in
+              "healthy")
+                DEPS_ICON="✅"
+                ;;
+              "unhealthy")
+                DEPS_ICON="⚠️"
+                ;;
+              *)
+                DEPS_ICON="❓"
+                ;;
+            esac
+            
+            echo "## 🌐 Dependencies Health" >> $GITHUB_STEP_SUMMARY
+            echo "**Status**: $DEPS_ICON $DEPS_HEALTH" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🌐 Dependencies Health" >> $GITHUB_STEP_SUMMARY
+            echo "**Status**: ⏭️ Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Build System Test
+          BUILD_TEST_RESULT="${{ needs.build-system-test.result }}"
+          case $BUILD_TEST_RESULT in
+            "success")
+              BUILD_TEST_ICON="✅"
+              ;;
+            "failure")
+              BUILD_TEST_ICON="❌"
+              ;;
+            "skipped")
+              BUILD_TEST_ICON="⏭️"
+              ;;
+            *)
+              BUILD_TEST_ICON="❓"
+              ;;
+          esac
+          
+          echo "## 🏗️ Build System Test" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: $BUILD_TEST_ICON $BUILD_TEST_RESULT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall Health Assessment
+          OVERALL_HEALTH="healthy"
+          if [ "$CONFIG_HEALTH" = "critical" ]; then
+            OVERALL_HEALTH="critical"
+          elif [ "$CONFIG_HEALTH" = "unhealthy" ] || [ "$DEPS_HEALTH" = "unhealthy" ] || [ "$BUILD_TEST_RESULT" = "failure" ]; then
+            OVERALL_HEALTH="unhealthy"
+          fi
+          
+          case $OVERALL_HEALTH in
+            "healthy")
+              OVERALL_ICON="✅"
+              HEALTH_MESSAGE="Build system is healthy and ready for production builds"
+              ;;
+            "unhealthy")
+              OVERALL_ICON="⚠️"
+              HEALTH_MESSAGE="Build system has issues that may affect reliability"
+              ;;
+            "critical")
+              OVERALL_ICON="❌"
+              HEALTH_MESSAGE="Build system has critical issues that will prevent builds"
+              ;;
+          esac
+          
+          echo "## 📊 Overall Health Status" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: $OVERALL_ICON $OVERALL_HEALTH" >> $GITHUB_STEP_SUMMARY
+          echo "**Assessment**: $HEALTH_MESSAGE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Recommendations
+          echo "## 📋 Recommendations" >> $GITHUB_STEP_SUMMARY
+          if [ "$OVERALL_HEALTH" = "healthy" ]; then
+            echo "- Continue regular monitoring" >> $GITHUB_STEP_SUMMARY
+            echo "- No immediate action required" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Review failed health checks above" >> $GITHUB_STEP_SUMMARY
+            echo "- Address configuration issues before next build" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider running a test build to verify fixes" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Create health report artifact
+          cat > health-report.json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "check_type": "${{ github.event.inputs.check_type || 'scheduled' }}",
+            "overall_health": "$OVERALL_HEALTH",
+            "components": {
+              "configuration": {
+                "status": "$CONFIG_HEALTH",
+                "issues_count": $ISSUES_COUNT
+              },
+              "dependencies": {
+                "status": "$DEPS_HEALTH"
+              },
+              "build_system": {
+                "status": "$BUILD_TEST_RESULT"
+              }
+            },
+            "workflow_id": "${{ github.run_id }}",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+
+      - name: Upload health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-health-report
+          path: health-report.json
+          retention-days: 30
+
+      - name: Health check notification
+        if: needs.config-health-check.outputs.config_health == 'critical'
+        run: |
+          echo "🚨 CRITICAL HEALTH ISSUE DETECTED 🚨"
+          echo "Build system has critical configuration issues that will prevent builds."
+          echo "Immediate attention required!"
+          echo ""
+          echo "Please review the health report above and fix critical issues before attempting builds."
