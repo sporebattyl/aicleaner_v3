@@ -111,3 +111,5 @@ config.yaml
 config.json
 !addons/*/config.yaml
 !addons/*/config.json
+!aicleaner_v3/config.yaml
+!aicleaner_v3/config.json
