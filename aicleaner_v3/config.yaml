@@ -61,9 +61,15 @@ schema:
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
   
-  # Entity Selections (Basic Mode)
-  default_camera: "str?"
-  default_todo_list: "str?"
+  # Entity Selections (Basic Mode) - Now with proper entity selectors
+  default_camera:
+    selector:
+      entity:
+        domain: camera
+  default_todo_list:
+    selector:
+      entity:
+        domain: todo
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"
