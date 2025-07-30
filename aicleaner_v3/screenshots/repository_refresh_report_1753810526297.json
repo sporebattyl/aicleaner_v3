@@ -1,0 +1,56 @@
+{
+  "executionTime": "2025-07-29T17:35:26.297Z",
+  "screenshots": [
+    {
+      "filename": "01_login_page_2025-07-29T17-35-10-742Z.png",
+      "description": "Home Assistant login page",
+      "timestamp": "2025-07-29T17:35:10.853Z"
+    },
+    {
+      "filename": "02_credentials_entered_2025-07-29T17-35-12-901Z.png",
+      "description": "Credentials entered",
+      "timestamp": "2025-07-29T17:35:13.002Z"
+    },
+    {
+      "filename": "03_logged_in_dashboard_2025-07-29T17-35-17-315Z.png",
+      "description": "Successfully logged in to Home Assistant",
+      "timestamp": "2025-07-29T17:35:17.478Z"
+    },
+    {
+      "filename": "04_settings_page_2025-07-29T17-35-19-464Z.png",
+      "description": "Settings page",
+      "timestamp": "2025-07-29T17:35:19.604Z"
+    },
+    {
+      "filename": "05_supervisor_dashboard_2025-07-29T17-35-21-610Z.png",
+      "description": "Supervisor dashboard",
+      "timestamp": "2025-07-29T17:35:21.694Z"
+    },
+    {
+      "filename": "06_addon_store_2025-07-29T17-35-23-771Z.png",
+      "description": "Add-on Store page",
+      "timestamp": "2025-07-29T17:35:23.886Z"
+    },
+    {
+      "filename": "07_repositories_page_2025-07-29T17-35-25-948Z.png",
+      "description": "Repositories management page",
+      "timestamp": "2025-07-29T17:35:26.064Z"
+    },
+    {
+      "filename": "10_before_add_2025-07-29T17-35-26-068Z.png",
+      "description": "Before adding repository",
+      "timestamp": "2025-07-29T17:35:26.180Z"
+    },
+    {
+      "filename": "final_error_2025-07-29T17-35-26-192Z.png",
+      "description": "Final error state: Repository addition failed",
+      "timestamp": "2025-07-29T17:35:26.297Z"
+    }
+  ],
+  "summary": {
+    "totalSteps": 8,
+    "completedSteps": 0,
+    "success": false,
+    "errors": []
+  }
+}
