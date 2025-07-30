@@ -61,12 +61,16 @@ schema:
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
   
-  # Entity Selections (Basic Mode) - Now with proper entity selectors
+  # Entity Selections (Basic Mode) - Proper entity selectors for dropdown UI
   default_camera:
+    name: "Default Camera Entity"
+    description: "Select the default camera entity for cleaning area monitoring"
     selector:
       entity:
         domain: camera
   default_todo_list:
+    name: "Default To-Do List Entity"
+    description: "Select the to-do list entity for automated task management"
     selector:
       entity:
         domain: todo
