@@ -61,7 +61,7 @@ jobs:
 
       - name: Check addon config version
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           CONFIG_VERSION=$(python -c "import yaml; print(yaml.safe_load(open('config.yaml'))['version'])")
           RELEASE_VERSION="${{ steps.version.outputs.version }}"
           
@@ -212,8 +212,8 @@ jobs:
           VERSION="${{ needs.validate-release.outputs.version }}"
           
           # Create addon package
-          cd aicleaner_v3
-          tar -czf "../aicleaner_v3-${VERSION}.tar.gz" \
+          cd addons/aicleaner_v3
+          tar -czf "../../aicleaner_v3-${VERSION}.tar.gz" \
             --exclude='.git*' \
             --exclude='__pycache__' \
             --exclude='*.pyc' \

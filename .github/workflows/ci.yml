@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: aicleaner_v3
+        working-directory: addons/aicleaner_v3
     
     steps:
     - name: Checkout code
@@ -31,7 +31,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-lint-${{ hashFiles('aicleaner_v3/requirements.txt') }}
+        key: ${{ runner.os }}-pip-lint-${{ hashFiles('addons/aicleaner_v3/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-lint-
           ${{ runner.os }}-pip-
@@ -60,7 +60,7 @@ jobs:
     needs: lint
     defaults:
       run:
-        working-directory: aicleaner_v3
+        working-directory: addons/aicleaner_v3
     
     steps:
     - name: Checkout code
@@ -75,7 +75,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-validate-${{ hashFiles('aicleaner_v3/requirements.txt') }}
+        key: ${{ runner.os }}-pip-validate-${{ hashFiles('addons/aicleaner_v3/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-validate-
           ${{ runner.os }}-pip-
@@ -152,7 +152,7 @@ except Exception as e:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py${{ matrix.python-version }}-pip-${{ hashFiles('aicleaner_v3/requirements.txt') }}
+        key: ${{ runner.os }}-py${{ matrix.python-version }}-pip-${{ hashFiles('addons/aicleaner_v3/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-py${{ matrix.python-version }}-pip-
           ${{ runner.os }}-pip-
@@ -220,7 +220,7 @@ except Exception as e:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-integration-${{ hashFiles('aicleaner_v3/requirements.txt') }}
+        key: ${{ runner.os }}-pip-integration-${{ hashFiles('addons/aicleaner_v3/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-integration-
           ${{ runner.os }}-pip-

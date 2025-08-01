@@ -48,11 +48,11 @@ jobs:
           echo "🔍 Checking main configuration files..."
           
           # Validate config.yaml
-          if [ -f "aicleaner_v3/config.yaml" ]; then
+          if [ -f "addons/aicleaner_v3/config.yaml" ]; then
             echo "✅ config.yaml exists"
             
             # YAML syntax check
-            if ! yamllint aicleaner_v3/config.yaml; then
+            if ! yamllint addons/aicleaner_v3/config.yaml; then
               ISSUES+=("config.yaml has YAML syntax errors") 
               CONFIG_HEALTH="unhealthy"
             fi
@@ -60,7 +60,7 @@ jobs:
             # Required fields check
             REQUIRED_FIELDS=("name" "version" "slug" "arch")
             for field in "${REQUIRED_FIELDS[@]}"; do
-              VALUE=$(yq eval ".$field" aicleaner_v3/config.yaml)
+              VALUE=$(yq eval ".$field" addons/aicleaner_v3/config.yaml)
               if [ "$VALUE" = "null" ] || [ -z "$VALUE" ]; then
                 ISSUES+=("Missing required field: $field")
                 CONFIG_HEALTH="unhealthy"
@@ -68,7 +68,7 @@ jobs:
             done
             
             # Architecture validation
-            ARCH_COUNT=$(yq eval '.arch | length' aicleaner_v3/config.yaml)
+            ARCH_COUNT=$(yq eval '.arch | length' addons/aicleaner_v3/config.yaml)
             if [ "$ARCH_COUNT" -eq 0 ]; then
               ISSUES+=("No architectures defined")
               CONFIG_HEALTH="unhealthy"
@@ -81,9 +81,9 @@ jobs:
           fi
           
           # Check build.yaml
-          if [ -f "aicleaner_v3/build.yaml" ]; then
+          if [ -f "addons/aicleaner_v3/build.yaml" ]; then
             echo "✅ build.yaml exists"
-            if ! yamllint aicleaner_v3/build.yaml; then
+            if ! yamllint addons/aicleaner_v3/build.yaml; then
               WARNINGS+=("build.yaml has YAML syntax warnings")
             fi
           else
@@ -91,17 +91,17 @@ jobs:
           fi
           
           # Check Dockerfile
-          if [ -f "aicleaner_v3/Dockerfile" ]; then
+          if [ -f "addons/aicleaner_v3/Dockerfile" ]; then
             echo "✅ Dockerfile exists"
             
             # Basic Dockerfile validation
-            if ! grep -q "^FROM " aicleaner_v3/Dockerfile; then
+            if ! grep -q "^FROM " addons/aicleaner_v3/Dockerfile; then
               ISSUES+=("Dockerfile missing FROM instruction")
               CONFIG_HEALTH="unhealthy"
             fi
             
             # Check for Home Assistant base image
-            if ! grep -q "home-assistant.*base" aicleaner_v3/Dockerfile; then
+            if ! grep -q "home-assistant.*base" addons/aicleaner_v3/Dockerfile; then
               WARNINGS+=("Not using official Home Assistant base image")
             fi
           else
@@ -237,7 +237,7 @@ jobs:
         run: |
           echo "🧪 Testing architecture detection system..."
           
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           
           # Install required tools
           sudo apt-get update && sudo apt-get install -y yq jq

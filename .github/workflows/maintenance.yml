@@ -42,7 +42,7 @@ jobs:
 
       - name: Check for dependency updates
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           
           # Create requirements.in if it doesn't exist
           if [ ! -f "requirements.in" ]; then
@@ -109,7 +109,7 @@ jobs:
 
       - name: Run Safety check
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           echo "🔍 Running Safety vulnerability check..."
           safety check --json --output safety-report.json || true
           
@@ -166,9 +166,9 @@ jobs:
         with:
           name: security-audit-reports
           path: |
-            aicleaner_v3/safety-report.json
-            aicleaner_v3/bandit-report.json
-            aicleaner_v3/semgrep-report.json
+            addons/aicleaner_v3/safety-report.json
+            addons/aicleaner_v3/bandit-report.json
+            addons/aicleaner_v3/semgrep-report.json
           retention-days: 30
 
   performance-check:

@@ -31,6 +31,6 @@ jobs:
         uses: home-assistant/builder@master
         with:
           args: |
-            --target ./aicleaner_v3 \
+            --target ./addons/aicleaner_v3 \
             --all \
             --docker-hub ${{ env.REGISTRY }}/${{ github.repository_owner }}
