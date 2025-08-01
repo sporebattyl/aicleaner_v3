@@ -75,4 +75,4 @@ schema:
   auto_dashboard: "bool"
 services:
   - "mqtt:want"
-image: "aicleaner_v3/{arch}"
+image: "sporebattyl/aicleaner_v3/{arch}"

@@ -33,4 +33,8 @@ jobs:
           args: |
             --target ./addons/aicleaner_v3 \
             --all \
-            --docker-hub ${{ env.REGISTRY }}/${{ github.repository_owner }}
+            --docker-hub ${{ env.REGISTRY }}/${{ github.repository_owner }}/aicleaner_v3 \
+            --docker-user ${{ github.repository_owner }} \
+            --docker-password ${{ secrets.GITHUB_TOKEN }}
+        env:
+          DOCKER_BUILDKIT: 1
