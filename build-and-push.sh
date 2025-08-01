@@ -9,9 +9,9 @@ echo "🏗️  Building AICleaner V3 Docker Image"
 echo "==============================================="
 
 # Configuration
-ADDON_DIR="/home/drewcifer/aicleaner_v3/aicleaner_v3"
+ADDON_DIR="/home/drewcifer/aicleaner_v3/addons/aicleaner_v3"
 IMAGE_NAME="ghcr.io/sporebattyl/aicleaner_v3"
-VERSION="1.1.0"
+VERSION="1.1.1"
 ARCHITECTURES=("amd64" "aarch64" "armhf" "armv7")
 
 # Check if directory exists
