@@ -49,7 +49,7 @@ class MQTTEntityTemplates:
                 "suggested_area": zone_name.lower()
             }
         else:
-            # Main system device configuration
+            # Main system device configuration - FIXED: Removed invalid 'origin' field
             return {
                 "identifiers": [f"aicleaner_{self.node_id}"],
                 "name": "AICleaner",
@@ -58,12 +58,7 @@ class MQTTEntityTemplates:
                 "sw_version": "2.0.1",
                 "configuration_url": "http://192.168.88.17:8099",
                 "hw_version": "MQTT",
-                "connections": [["mac", "02:00:00:00:00:00"]],  # Virtual MAC for identification
-                "origin": {
-                    "name": "AICleaner",
-                    "sw_version": "2.0.1",
-                    "support_url": "https://github.com/user/aicleaner"
-                }
+                "connections": [["mac", "02:00:00:00:00:00"]]  # Virtual MAC for identification
             }
 
     def get_main_device_config(self) -> Dict[str, Any]:
@@ -137,6 +132,7 @@ class MQTTEntityTemplates:
     def create_system_status_sensor(self) -> Dict[str, Any]:
         """
         Create system status sensor discovery payload with comprehensive attributes
+        FIXED: Removed invalid 'entity_category' field
 
         Returns:
             Dict containing discovery configuration
@@ -151,7 +147,6 @@ class MQTTEntityTemplates:
             "device_class": None,
             "state_class": None,
             "icon": "mdi:robot-vacuum",
-            "entity_category": "diagnostic",
             "device": self.get_device_config(),
             # Additional configuration for rich attributes
             "force_update": True,
@@ -169,6 +164,7 @@ class MQTTEntityTemplates:
     def create_zone_task_sensor(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone task sensor discovery payload
+        FIXED: Removed invalid 'entity_category' field
         
         Args:
             zone_name: Human-readable zone name
@@ -188,13 +184,13 @@ class MQTTEntityTemplates:
             "unit_of_measurement": "tasks",
             "state_class": "measurement",
             "icon": "mdi:format-list-checks",
-            "entity_category": None,
             "device": self.get_device_config(zone_name)
         }
         
     def create_zone_cleanliness_sensor(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone cleanliness sensor discovery payload
+        FIXED: Removed invalid 'entity_category' field
         
         Args:
             zone_name: Human-readable zone name
@@ -214,13 +210,13 @@ class MQTTEntityTemplates:
             "unit_of_measurement": "%",
             "state_class": "measurement",
             "icon": "mdi:sparkles",
-            "entity_category": None,
             "device": self.get_device_config(zone_name)
         }
         
     def create_zone_analyze_button(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone analyze button discovery payload
+        FIXED: Removed invalid 'entity_category' field
         
         Args:
             zone_name: Human-readable zone name
@@ -238,13 +234,13 @@ class MQTTEntityTemplates:
             "payload_press": "ANALYZE",
             "device_class": None,
             "icon": "mdi:camera-iris",
-            "entity_category": None,
             "device": self.get_device_config(zone_name)
         }
         
     def create_zone_camera_button(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone camera button discovery payload
+        FIXED: Removed invalid 'entity_category' field
         
         Args:
             zone_name: Human-readable zone name
@@ -262,13 +258,13 @@ class MQTTEntityTemplates:
             "payload_press": "SNAPSHOT",
             "device_class": None,
             "icon": "mdi:camera",
-            "entity_category": None,
             "device": self.get_device_config(zone_name)
         }
         
     def create_ai_model_select(self) -> Dict[str, Any]:
         """
         Create AI model selection entity discovery payload
+        FIXED: Removed invalid 'entity_category' field
         
         Returns:
             Dict containing discovery configuration
@@ -282,7 +278,6 @@ class MQTTEntityTemplates:
             "availability_topic": f"{self.node_id}/availability",
             "options": ["flash", "pro"],
             "icon": "mdi:brain",
-            "entity_category": "config",
             "device": self.get_device_config()
         }
         
@@ -438,19 +433,6 @@ class MQTTEntityTemplates:
         # Remove leading/trailing underscores
         sanitized = sanitized.strip('_')
         return sanitized or 'unknown_zone'
-
-    def get_attributes_topic(self, component: str, object_id: str) -> str:
-        """
-        Generate attributes topic for entity
-
-        Args:
-            component: Component type (sensor, button, select)
-            object_id: Object identifier
-
-        Returns:
-            Attributes topic string
-        """
-        return f"{self.discovery_prefix}/{component}/{self.node_id}/{object_id}/attributes"
 
     def get_attributes_payload(self, attributes: Dict[str, Any]) -> str:
         """

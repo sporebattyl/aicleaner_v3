@@ -1,0 +1,26 @@
+{
+  "debug_mode": true,
+  "log_level": "debug",
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "core_service_url": "http://localhost:8000",
+  "default_camera": "camera.rowan_room_fluent",
+  "default_todo_list": "todo.rowan_room_cleaning_to_do",
+  "device_id": "aicleaner_v3_rowan",
+  "mqtt_discovery_prefix": "homeassistant",
+  "enable_zones": true,
+  "zones": [
+    {
+      "name": "Rowan's Room",
+      "camera_entity": "camera.rowan_room_fluent",
+      "todo_list_entity": "todo.rowan_room_cleaning_to_do",
+      "purpose": "Monitor and manage cleanliness of Rowan's room",
+      "interval_minutes": 30,
+      "ignore_rules": [
+        "Ignore items that are supposed to be there",
+        "Don't flag normal bedroom furniture",
+        "Focus on cleanliness not organization"
+      ]
+    }
+  ]
+}

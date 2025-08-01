@@ -1,5 +1,5 @@
 name: "AICleaner V3"
-version: "1.1.0"
+version: "1.1.1"
 slug: "aicleaner_v3"
 description: "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration"
 url: "https://github.com/sporebattyl/aicleaner_v3/tree/main/aicleaner_v3"
@@ -12,8 +12,9 @@ init: false
 startup: application
 boot: auto
 hassio_api: true
-hassio_role: default
+hassio_role: manager
 homeassistant_api: true
+auth_api: true
 host_network: false
 privileged: []
 ingress: true
@@ -61,19 +62,9 @@ schema:
   # MQTT Discovery (auto-configured)
   mqtt_discovery_prefix: "str"
   
-  # Entity Selections (Basic Mode) - Proper entity selectors for dropdown UI
-  default_camera:
-    name: "Default Camera Entity"
-    description: "Select the default camera entity for cleaning area monitoring"
-    selector:
-      entity:
-        domain: camera
-  default_todo_list:
-    name: "Default To-Do List Entity"
-    description: "Select the to-do list entity for automated task management"
-    selector:
-      entity:
-        domain: todo
+  # Entity Selections (Basic Mode) - Manual entity ID entry
+  default_camera: "str?"
+  default_todo_list: "str?"
   
   # Zone Configuration (Advanced Mode)
   enable_zones: "bool"

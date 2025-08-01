@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AICleaner V3 Add-on Main Application
-Entry point for the Home Assistant add-on version of AICleaner V3
+AICleaner V3 Add-on Enhanced Main Application
+Entry point with enhanced web UI for configuration
 """
 
 import os
@@ -12,6 +12,14 @@ import sys
 import asyncio
 from typing import Dict, Any, List
 import paho.mqtt.client as mqtt
+
+# Try to import the enhanced web UI
+try:
+    from web_ui_enhanced import EnhancedWebUI
+    HAS_ENHANCED_UI = True
+except ImportError:
+    HAS_ENHANCED_UI = False
+    logging.warning("Enhanced web UI not available, falling back to basic functionality")
 
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
@@ -37,14 +45,33 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN")
 HOMEASSISTANT_API = os.getenv("HOMEASSISTANT_API", "http://supervisor/core/api")
 
-class AICleaner:
-    """Main AICleaner application class"""
+class EnhancedAICleaner:
+    """Enhanced AICleaner application class with web UI"""
     
     def __init__(self):
         self.mqtt_client = None
         self.running = True
         self.status = "starting"
         self.enabled = True
+        self.ai_response_count = 0
+        self.last_ai_request = None
+        self.web_ui = None
+        
+        # Initialize enhanced web UI if available
+        if HAS_ENHANCED_UI:
+            self.web_ui = EnhancedWebUI(self)
+            logger.info("Enhanced web UI initialized")
+        
+    def load_addon_options(self) -> Dict[str, Any]:
+        """Load addon options from /data/options.json"""
+        options_file = '/data/options.json'
+        if os.path.exists(options_file):
+            try:
+                with open(options_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading options.json: {e}")
+        return {}
         
     def get_device_config(self) -> Dict[str, Any]:
         """Returns the device configuration payload for MQTT discovery"""
@@ -52,8 +79,8 @@ class AICleaner:
             "identifiers": [DEVICE_ID],
             "name": "AICleaner V3",
             "manufacturer": "AICleaner Project",
-            "model": "AICleaner V3 Add-on",
-            "sw_version": "1.0.0"
+            "model": "AICleaner V3 Enhanced Add-on",
+            "sw_version": "1.1.0-enhanced"
         }
     
     def register_entities(self):
@@ -63,6 +90,13 @@ class AICleaner:
         if not self.mqtt_client:
             logger.error("MQTT client not connected")
             return
+        
+        # Load addon options to get configured entities
+        options = self.load_addon_options()
+        default_camera = options.get('default_camera', '')
+        default_todo_list = options.get('default_todo_list', '')
+        
+        logger.info(f"Configured entities - Camera: {default_camera}, Todo: {default_todo_list}")
         
         # 1. Status Sensor
         status_topic = f"{DISCOVERY_PREFIX}/sensor/{DEVICE_ID}/status/config"
@@ -91,6 +125,18 @@ class AICleaner:
         }
         self.mqtt_client.publish(switch_topic, json.dumps(switch_payload), retain=True)
         
+        # 3. Configuration Status Sensor
+        config_topic = f"{DISCOVERY_PREFIX}/sensor/{DEVICE_ID}/config_status/config"
+        config_payload = {
+            "name": "AICleaner Configuration Status",
+            "unique_id": f"{DEVICE_ID}_config_status",
+            "state_topic": f"aicleaner/{DEVICE_ID}/config",
+            "value_template": "{{ value_json.status }}",
+            "icon": "mdi:cog",
+            "device": self.get_device_config()
+        }
+        self.mqtt_client.publish(config_topic, json.dumps(config_payload), retain=True)
+        
         logger.info("Entity registration complete.")
     
     def publish_state(self):
@@ -98,15 +144,31 @@ class AICleaner:
         if not self.mqtt_client:
             return
             
+        # Load current configuration
+        options = self.load_addon_options()
+        
         state = {
             "status": self.status,
             "enabled": "ON" if self.enabled else "OFF",
             "timestamp": str(asyncio.get_event_loop().time())
         }
         
+        config_state = {
+            "status": "configured" if options.get('default_camera') and options.get('default_todo_list') else "needs_configuration",
+            "camera": options.get('default_camera', ''),
+            "todo_list": options.get('default_todo_list', ''),
+            "timestamp": str(asyncio.get_event_loop().time())
+        }
+        
         self.mqtt_client.publish(
             f"aicleaner/{DEVICE_ID}/state",
             json.dumps(state),
+            retain=True
+        )
+        
+        self.mqtt_client.publish(
+            f"aicleaner/{DEVICE_ID}/config",
+            json.dumps(config_state),
             retain=True
         )
     
@@ -186,14 +248,22 @@ class AICleaner:
             self.publish_state()
             self.mqtt_client.disconnect()
     
+    async def start_web_ui(self):
+        """Start the enhanced web UI server"""
+        if self.web_ui:
+            try:
+                await self.web_ui.start_server(host='0.0.0.0', port=8080)
+            except Exception as e:
+                logger.error(f"Failed to start web UI: {e}")
+    
     async def run(self):
         """Main application loop"""
-        logger.info("Starting AICleaner V3...")
+        logger.info("Starting Enhanced AICleaner V3...")
         
-        # Validate configuration
-        if not PRIMARY_API_KEY:
-            logger.error("Primary API key not configured")
-            return False
+        # Start web UI server if available
+        if self.web_ui:
+            web_task = asyncio.create_task(self.start_web_ui())
+            logger.info("Web UI server task created")
         
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -201,42 +271,47 @@ class AICleaner:
         
         # Set up MQTT connection
         if not self.setup_mqtt():
-            return False
+            logger.warning("MQTT connection failed, continuing with reduced functionality")
         
-        logger.info("AICleaner V3 started successfully")
+        logger.info("Enhanced AICleaner V3 started successfully")
         
         # Main loop
         while self.running:
             try:
                 # Publish periodic state updates
-                self.publish_state()
+                if self.mqtt_client:
+                    self.publish_state()
                 
-                # Perform AI cleaning tasks (placeholder for now)
-                if self.enabled and self.status not in ["error", "stopping"]:
-                    # TODO: Add actual AI processing logic here
-                    await asyncio.sleep(30)  # Process every 30 seconds
+                # Check configuration status
+                options = self.load_addon_options()
+                has_camera = bool(options.get('default_camera'))
+                has_todo = bool(options.get('default_todo_list'))
+                
+                if has_camera and has_todo:
+                    # Perform AI cleaning tasks (placeholder for now)
+                    if self.enabled and self.status not in ["error", "stopping"]:
+                        logger.debug(f"Processing with camera: {options['default_camera']}, todo: {options['default_todo_list']}")
+                        await asyncio.sleep(30)  # Process every 30 seconds
+                    else:
+                        await asyncio.sleep(5)   # Check more frequently when disabled
                 else:
-                    await asyncio.sleep(5)   # Check more frequently when disabled
+                    logger.info("Waiting for configuration - visit web interface to configure entities")
+                    await asyncio.sleep(10)  # Check configuration more frequently
                     
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
                 self.status = "error"
                 await asyncio.sleep(10)
         
-        logger.info("AICleaner V3 stopped")
+        logger.info("Enhanced AICleaner V3 stopped")
         return True
 
 def main():
     """Main entry point"""
-    logger.info("AICleaner V3 Add-on starting up...")
+    logger.info("Enhanced AICleaner V3 Add-on starting up...")
     
-    # Validate critical configuration
-    if not PRIMARY_API_KEY:
-        logger.error("Primary API key is required")
-        sys.exit(1)
-    
-    # Create and run application
-    app = AICleaner()
+    # Create and run enhanced application
+    app = EnhancedAICleaner()
     
     try:
         asyncio.run(app.run())

@@ -51,7 +51,7 @@ fi
 
 # --- 4. HOME ASSISTANT API ---
 # Supervisor provides HA API access
-export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"
+export SUPERVISOR_TOKEN="${HASSIO_TOKEN}"
 export HOMEASSISTANT_API="http://supervisor/core/api"
 
 bashio::log.info "Configuration loaded successfully:"
