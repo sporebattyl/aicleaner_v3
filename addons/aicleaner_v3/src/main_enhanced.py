@@ -13,6 +13,61 @@ import asyncio
 from typing import Dict, Any, List
 import paho.mqtt.client as mqtt
 
+# Robust environment variable helpers for HA addon development
+def get_int_env(key: str, default: int) -> int:
+    """Get integer environment variable with robust handling of empty strings.
+    
+    Args:
+        key: Environment variable name
+        default: Default value if variable is unset or empty
+        
+    Returns:
+        Integer value from environment or default
+        
+    Raises:
+        ValueError: If variable is set but cannot be converted to int
+    """
+    value = os.getenv(key)
+    if not value or not value.strip():
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(f"Invalid integer value for {key}='{value}', using default {default}")
+        return default
+
+def get_str_env(key: str, default: str = "") -> str:
+    """Get string environment variable with empty string handling.
+    
+    Args:
+        key: Environment variable name  
+        default: Default value if variable is unset or empty
+        
+    Returns:
+        String value from environment or default
+    """
+    value = os.getenv(key)
+    return value if value and value.strip() else default
+
+def get_json_env(key: str, default: str = "[]") -> any:
+    """Get JSON environment variable with robust error handling.
+    
+    Args:
+        key: Environment variable name
+        default: Default JSON string if variable is unset or empty
+        
+    Returns:
+        Parsed JSON value from environment or default
+    """
+    value = os.getenv(key)
+    if not value or not value.strip():
+        return json.loads(default)
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        logger.warning(f"Invalid JSON value for {key}='{value}', using default {default}")
+        return json.loads(default)
+
 # Try to import the enhanced web UI
 try:
     from web_ui_enhanced import EnhancedWebUI
@@ -31,15 +86,21 @@ logger = logging.getLogger(__name__)
 
 # Configuration from environment variables
 PRIMARY_API_KEY = os.getenv("PRIMARY_API_KEY")
-BACKUP_API_KEYS = json.loads(os.getenv("BACKUP_API_KEYS", "[]"))
+BACKUP_API_KEYS = get_json_env("BACKUP_API_KEYS", "[]")
 DEVICE_ID = os.getenv("DEVICE_ID", "aicleaner_v3")
 DISCOVERY_PREFIX = os.getenv("MQTT_DISCOVERY_PREFIX", "homeassistant")
 
-# MQTT Configuration
-MQTT_HOST = os.getenv("MQTT_HOST")
-MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
-MQTT_USER = os.getenv("MQTT_USER")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+# MQTT Configuration - robust handling for when MQTT service unavailable
+MQTT_HOST = get_str_env("MQTT_HOST")
+MQTT_PORT = get_int_env("MQTT_PORT", 1883)
+MQTT_USER = get_str_env("MQTT_USER")
+MQTT_PASSWORD = get_str_env("MQTT_PASSWORD")
+
+# Log MQTT configuration status
+if MQTT_HOST:
+    logger.info(f"MQTT broker configured: {MQTT_HOST}:{MQTT_PORT}")
+else:
+    logger.warning("MQTT broker not configured - entity discovery disabled")
 
 # Home Assistant API
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN")

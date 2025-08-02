@@ -86,11 +86,9 @@ else
     bashio::log.warning "4. Restart this addon after MQTT setup is complete"
     bashio::log.info "Addon will continue with reduced functionality..."
     
-    # Set empty MQTT variables for Python application
-    export MQTT_HOST=""
-    export MQTT_PORT=""
-    export MQTT_USER=""
-    export MQTT_PASSWORD=""
+    # Following HA addon best practices: don't export empty variables
+    # The Python application will use defaults when these variables are unset
+    bashio::log.debug "MQTT environment variables not exported (service unavailable)"
 fi
 
 # --- 4. HOME ASSISTANT API ---
