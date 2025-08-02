@@ -132,20 +132,18 @@ class MQTTEntityTemplates:
     def create_system_status_sensor(self) -> Dict[str, Any]:
         """
         Create system status sensor discovery payload with comprehensive attributes
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category and device_class when None
 
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": "AICleaner System Status",
             "unique_id": f"{self.node_id}_system_status",
             "object_id": "system_status",
             "state_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/system_status/state",
             "json_attributes_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/system_status/attributes",
             "availability_topic": f"{self.node_id}/availability",
-            "device_class": None,
-            "state_class": None,
             "icon": "mdi:robot-vacuum",
             "device": self.get_device_config(),
             # Additional configuration for rich attributes
@@ -160,11 +158,14 @@ class MQTTEntityTemplates:
             # - mqtt_enabled, mqtt_connected, discovery_prefix
             # - version, addon_name, last_analysis, last_updated
         }
+        # Only add entity_category if it has a valid value (not None)
+        # HA schema requires omitting this field if not set, not setting to None
+        return config
         
     def create_zone_task_sensor(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone task sensor discovery payload
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category and device_class when None
         
         Args:
             zone_name: Human-readable zone name
@@ -173,24 +174,25 @@ class MQTTEntityTemplates:
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": f"{zone_name} Tasks",
             "unique_id": f"{self.node_id}_zone_{zone_id}_tasks",
             "object_id": f"zone_{zone_id}_tasks",
             "state_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/zone_{zone_id}_tasks/state",
             "json_attributes_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/zone_{zone_id}_tasks/attributes",
             "availability_topic": f"{self.node_id}/availability",
-            "device_class": None,
             "unit_of_measurement": "tasks",
             "state_class": "measurement",
             "icon": "mdi:format-list-checks",
             "device": self.get_device_config(zone_name)
         }
+        # Only add device_class and entity_category if they have valid values (not None)
+        return config
         
     def create_zone_cleanliness_sensor(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone cleanliness sensor discovery payload
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category and device_class when None
         
         Args:
             zone_name: Human-readable zone name
@@ -199,24 +201,25 @@ class MQTTEntityTemplates:
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": f"{zone_name} Cleanliness",
             "unique_id": f"{self.node_id}_zone_{zone_id}_cleanliness",
             "object_id": f"zone_{zone_id}_cleanliness",
             "state_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/zone_{zone_id}_cleanliness/state",
             "json_attributes_topic": f"{self.discovery_prefix}/sensor/{self.node_id}/zone_{zone_id}_cleanliness/attributes",
             "availability_topic": f"{self.node_id}/availability",
-            "device_class": None,
             "unit_of_measurement": "%",
             "state_class": "measurement",
             "icon": "mdi:sparkles",
             "device": self.get_device_config(zone_name)
         }
+        # Only add device_class and entity_category if they have valid values (not None)
+        return config
         
     def create_zone_analyze_button(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone analyze button discovery payload
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category and device_class when None
         
         Args:
             zone_name: Human-readable zone name
@@ -225,22 +228,23 @@ class MQTTEntityTemplates:
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": f"Analyze {zone_name}",
             "unique_id": f"{self.node_id}_zone_{zone_id}_analyze",
             "object_id": f"zone_{zone_id}_analyze",
             "command_topic": f"{self.discovery_prefix}/button/{self.node_id}/zone_{zone_id}_analyze/command",
             "availability_topic": f"{self.node_id}/availability",
             "payload_press": "ANALYZE",
-            "device_class": None,
             "icon": "mdi:camera-iris",
             "device": self.get_device_config(zone_name)
         }
+        # Only add device_class and entity_category if they have valid values (not None)
+        return config
         
     def create_zone_camera_button(self, zone_name: str, zone_id: str) -> Dict[str, Any]:
         """
         Create zone camera button discovery payload
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category and device_class when None
         
         Args:
             zone_name: Human-readable zone name
@@ -249,27 +253,28 @@ class MQTTEntityTemplates:
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": f"Take {zone_name} Snapshot",
             "unique_id": f"{self.node_id}_zone_{zone_id}_camera",
             "object_id": f"zone_{zone_id}_camera",
             "command_topic": f"{self.discovery_prefix}/button/{self.node_id}/zone_{zone_id}_camera/command",
             "availability_topic": f"{self.node_id}/availability",
             "payload_press": "SNAPSHOT",
-            "device_class": None,
             "icon": "mdi:camera",
             "device": self.get_device_config(zone_name)
         }
+        # Only add device_class and entity_category if they have valid values (not None)
+        return config
         
     def create_ai_model_select(self) -> Dict[str, Any]:
         """
         Create AI model selection entity discovery payload
-        FIXED: Removed invalid 'entity_category' field
+        FIXED: Properly omit entity_category when None, add entity_category config for config entities
         
         Returns:
             Dict containing discovery configuration
         """
-        return {
+        config = {
             "name": "AI Model",
             "unique_id": f"{self.node_id}_ai_model",
             "object_id": "ai_model",
@@ -278,8 +283,10 @@ class MQTTEntityTemplates:
             "availability_topic": f"{self.node_id}/availability",
             "options": ["flash", "pro"],
             "icon": "mdi:brain",
+            "entity_category": "config",  # Config entities should have entity_category
             "device": self.get_device_config()
         }
+        return config
         
     def get_state_payload(self, state: Any, attributes: Optional[Dict[str, Any]] = None) -> str:
         """

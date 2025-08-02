@@ -517,22 +517,38 @@ class EnhancedWebUI:
                 'ai_response_count': getattr(self.app, 'ai_response_count', 0),
                 'last_ai_request': getattr(self.app, 'last_ai_request', None),
                 'device_id': os.getenv('DEVICE_ID', 'aicleaner_v3'),
-                'version': 'enhanced-1.0.0'
+                'version': 'enhanced-1.0.0',
+                'supervisor_token_available': bool(os.getenv('SUPERVISOR_TOKEN'))
             }
             return web.json_response(status_data)
         except Exception as e:
             logger.error(f"Error in api_status: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+            # Always return JSON response
+            return web.json_response({'error': str(e), 'success': False}, status=500)
     
     async def api_test_generation(self, request: web_request.Request):
         """API endpoint to test AI generation"""
         try:
+            # Test HA API connectivity as well
+            supervisor_token = os.getenv('SUPERVISOR_TOKEN')
+            if supervisor_token:
+                # Try a simple API call to verify connectivity
+                async with aiohttp.ClientSession() as session:
+                    headers = {'Authorization': f'Bearer {supervisor_token}'}
+                    async with session.get('http://supervisor/core/api/config', headers=headers) as response:
+                        ha_accessible = response.status == 200
+            else:
+                ha_accessible = False
+            
             return web.json_response({
                 'success': True,
-                'result': 'Test successful - Enhanced UI is working!'
+                'result': 'Test successful - Enhanced UI is working!',
+                'ha_api_accessible': ha_accessible,
+                'supervisor_token_available': bool(supervisor_token)
             })
         except Exception as e:
             logger.error(f"Error in api_test_generation: {e}")
+            # Always return JSON response
             return web.json_response({
                 'success': False,
                 'error': str(e)
@@ -552,12 +568,14 @@ class EnhancedWebUI:
                 'log_level': os.getenv('LOG_LEVEL', addon_options.get('log_level', 'info')),
                 'debug_mode': os.getenv('DEBUG_MODE', str(addon_options.get('debug_mode', False))),
                 'default_camera': addon_options.get('default_camera', ''),
-                'default_todo_list': addon_options.get('default_todo_list', '')
+                'default_todo_list': addon_options.get('default_todo_list', ''),
+                'success': True
             }
             return web.json_response(config_data)
         except Exception as e:
             logger.error(f"Error in api_config: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+            # Always return JSON response
+            return web.json_response({'error': str(e), 'success': False}, status=500)
     
     async def api_update_config(self, request: web_request.Request):
         """API endpoint to update configuration"""
@@ -593,53 +611,72 @@ class EnhancedWebUI:
                 'error': str(e)
             }, status=500)
     
+    async def get_homeassistant_entities(self) -> Dict[str, Any]:
+        """Query Home Assistant API for all entities"""
+        supervisor_token = os.getenv('SUPERVISOR_TOKEN')
+        if not supervisor_token:
+            raise Exception("SUPERVISOR_TOKEN not available")
+        
+        headers = {
+            'Authorization': f'Bearer {supervisor_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get('http://supervisor/core/api/states', headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    error_text = await response.text()
+                    raise Exception(f"HA API call failed: {response.status} - {error_text}")
+    
     async def api_entities(self, request: web_request.Request):
-        """API endpoint to get Home Assistant entities"""
+        """API endpoint to get Home Assistant entities with real HA API calls"""
         try:
-            # For now, return the specific entities we know exist
-            # This could be enhanced to actually query Home Assistant API
-            mock_entities = {
-                'cameras': [
-                    {
-                        'entity_id': 'camera.rowan_room_fluent',
-                        'friendly_name': 'Rowan Room Fluent',
-                        'state': 'idle'
-                    },
-                    {
-                        'entity_id': 'camera.front_yard_fluent',
-                        'friendly_name': 'Front Yard Fluent',
-                        'state': 'idle'
-                    },
-                    {
-                        'entity_id': 'camera.driveway_fluent_lens_0',
-                        'friendly_name': 'Driveway Fluent lens 0',
-                        'state': 'idle'
-                    }
-                ],
-                'todo_lists': [
-                    {
-                        'entity_id': 'todo.rowan_room_cleaning_to_do',
-                        'friendly_name': 'Rowan room cleaning to-do',
-                        'state': '50'
-                    },
-                    {
-                        'entity_id': 'todo.shopping_list',
-                        'friendly_name': 'Shopping List',
-                        'state': '0'
-                    }
-                ],
-                'success': True
-            }
+            logger.info("Fetching entities from Home Assistant API...")
             
-            return web.json_response(mock_entities)
+            # Get all entities from Home Assistant
+            all_entities = await self.get_homeassistant_entities()
+            
+            # Filter for cameras and todo lists
+            cameras = []
+            todo_lists = []
+            
+            for entity in all_entities:
+                entity_id = entity.get('entity_id', '')
+                domain = entity_id.split('.')[0] if '.' in entity_id else ''
+                
+                if domain == 'camera':
+                    cameras.append({
+                        'entity_id': entity_id,
+                        'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
+                        'state': entity.get('state', 'unknown')
+                    })
+                elif domain == 'todo':
+                    todo_lists.append({
+                        'entity_id': entity_id,
+                        'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
+                        'state': entity.get('state', 'unknown')
+                    })
+            
+            logger.info(f"Found {len(cameras)} cameras and {len(todo_lists)} todo lists")
+            
+            return web.json_response({
+                'cameras': cameras,
+                'todo_lists': todo_lists,
+                'success': True,
+                'total_entities': len(all_entities)
+            })
             
         except Exception as e:
             logger.error(f"Error in api_entities: {e}")
+            # Always return JSON, never HTML error pages
             return web.json_response({
                 'cameras': [],
                 'todo_lists': [],
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'total_entities': 0
             })
 
     async def start_server(self, host='0.0.0.0', port=8080):
