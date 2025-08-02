@@ -77,8 +77,8 @@ services:
       - HA_URL=http://supervisor/core
       
       # Home Assistant Supervisor API
-      - HASSIO_TOKEN=${HASSIO_TOKEN}
-      - HASSIO_API=http://supervisor
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
+      - SUPERVISOR_API=http://supervisor
       
       # Performance Settings for HA environment
       - MAX_MEMORY_USAGE=2048

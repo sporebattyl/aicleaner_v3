@@ -166,8 +166,8 @@ services:
       - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-test_supervisor_token_12345}
       - HA_TOKEN=${HA_TOKEN:-test_ha_token_67890}
       - HA_URL=http://homeassistant:8123
-      - HASSIO_TOKEN=${SUPERVISOR_TOKEN:-test_supervisor_token_12345}
-      - HASSIO_API=http://supervisor_mock:8099
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-test_supervisor_token_12345}
+      - SUPERVISOR_API=http://supervisor_mock:8099
       
       # AI Provider Configuration (with key rotation)
       - GEMINI_API_KEY=${GEMINI_API_KEY_1:-AIzaSyBtBJg2AHVlNYZCSco69JWGkCL8zDFQNzo}

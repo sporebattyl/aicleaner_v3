@@ -50,8 +50,8 @@ else
 fi
 
 # --- 4. HOME ASSISTANT API ---
-# Supervisor provides HA API access
-export SUPERVISOR_TOKEN="${HASSIO_TOKEN}"
+# Supervisor provides HA API access automatically via SUPERVISOR_TOKEN environment variable
+# SUPERVISOR_TOKEN is provided by Home Assistant when hassio_api: true is set in config.yaml
 export HOMEASSISTANT_API="http://supervisor/core/api"
 
 bashio::log.info "Configuration loaded successfully:"
