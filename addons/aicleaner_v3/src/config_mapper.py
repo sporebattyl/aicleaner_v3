@@ -12,20 +12,51 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 
+def get_default_options() -> Dict[str, Any]:
+    """Return comprehensive default options for the addon."""
+    return {
+        "log_level": "info",
+        "device_id": "aicleaner_v3",
+        "primary_api_key": "",
+        "backup_api_keys": [],
+        "mqtt_discovery_prefix": "homeassistant",
+        "default_camera": "",
+        "default_todo_list": "",
+        "enable_zones": False,
+        "zones": [],
+        "debug_mode": False,
+        "auto_dashboard": True
+    }
+
 def load_addon_options() -> Dict[str, Any]:
-    """Load addon options from Home Assistant options.json file."""
+    """Load addon options from Home Assistant options.json file with robust fallbacks."""
     options_file = Path("/data/options.json")
+    defaults = get_default_options()
     
     if not options_file.exists():
-        print("WARNING: No options.json found, using defaults")
-        return {}
+        print("INFO: No options.json found, using default configuration")
+        print("INFO: This is normal for first startup or development environment")
+        return defaults
     
     try:
         with open(options_file, 'r') as f:
-            return json.load(f)
+            loaded_options = json.load(f)
+            
+        # Merge loaded options with defaults to ensure all keys exist
+        merged_options = defaults.copy()
+        merged_options.update(loaded_options)
+        
+        print(f"INFO: Configuration loaded with {len(loaded_options)} user settings")
+        return merged_options
+        
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON in options.json: {e}")
+        print("INFO: Using default configuration")
+        return defaults
     except Exception as e:
         print(f"ERROR: Failed to load options.json: {e}")
-        return {}
+        print("INFO: Using default configuration")
+        return defaults
 
 
 def map_log_level(addon_log_level: str) -> str:
@@ -55,22 +86,31 @@ def determine_active_provider(primary_api_key: str, backup_api_keys: List[str]) 
 
 
 def create_user_config(options: Dict[str, Any]) -> Dict[str, Any]:
-    """Create user configuration from addon options."""
+    """Create user configuration from addon options with robust defaults."""
     
-    # Extract values with defaults
-    log_level = options.get("log_level", "info")
-    device_id = options.get("device_id", "aicleaner_v3")
-    primary_api_key = options.get("primary_api_key", "")
-    backup_api_keys = options.get("backup_api_keys", [])
-    mqtt_discovery_prefix = options.get("mqtt_discovery_prefix", "homeassistant")
-    debug_mode = options.get("debug_mode", False)
-    auto_dashboard = options.get("auto_dashboard", True)
+    # Get defaults for fallback
+    defaults = get_default_options()
     
-    # Extract entity selections
-    default_camera = options.get("default_camera", "")
-    default_todo_list = options.get("default_todo_list", "")
-    enable_zones = options.get("enable_zones", False)
-    zones = options.get("zones", [])
+    # Extract values with robust defaults (using defaults dict as fallback)
+    log_level = options.get("log_level", defaults["log_level"])
+    device_id = options.get("device_id", defaults["device_id"])
+    primary_api_key = options.get("primary_api_key", defaults["primary_api_key"])
+    backup_api_keys = options.get("backup_api_keys", defaults["backup_api_keys"])
+    mqtt_discovery_prefix = options.get("mqtt_discovery_prefix", defaults["mqtt_discovery_prefix"])
+    debug_mode = options.get("debug_mode", defaults["debug_mode"])
+    auto_dashboard = options.get("auto_dashboard", defaults["auto_dashboard"])
+    
+    # Extract entity selections with defaults
+    default_camera = options.get("default_camera", defaults["default_camera"])
+    default_todo_list = options.get("default_todo_list", defaults["default_todo_list"])
+    enable_zones = options.get("enable_zones", defaults["enable_zones"])
+    zones = options.get("zones", defaults["zones"])
+    
+    # Validate and sanitize values
+    if not isinstance(backup_api_keys, list):
+        backup_api_keys = []
+    if not isinstance(zones, list):
+        zones = []
     
     # Determine active provider
     active_provider = determine_active_provider(primary_api_key, backup_api_keys)

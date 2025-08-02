@@ -215,28 +215,40 @@ class EnhancedAICleaner:
             logger.error(f"Error processing MQTT message: {e}")
     
     def setup_mqtt(self):
-        """Set up MQTT client and connection"""
-        if not MQTT_HOST:
-            logger.error("MQTT host not configured")
+        """Set up MQTT client and connection with graceful fallbacks"""
+        if not MQTT_HOST or MQTT_HOST.strip() == "":
+            logger.warning("🔌 MQTT host not configured - entity discovery disabled")
+            logger.info("📋 To enable MQTT features:")
+            logger.info("  1. Install 'Mosquitto broker' addon")
+            logger.info("  2. Configure MQTT integration in Home Assistant")
+            logger.info("  3. Restart this addon")
+            logger.info("🔄 Addon will continue with local functionality only")
             return False
         
-        self.mqtt_client = mqtt.Client()
-        
-        # Set credentials if provided (optional for testing)
-        if MQTT_USER and MQTT_PASSWORD:
-            self.mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-            logger.info(f"Using MQTT authentication for user: {MQTT_USER}")
-        else:
-            logger.info("Using anonymous MQTT connection")
-        self.mqtt_client.on_connect = self.on_mqtt_connect
-        self.mqtt_client.on_message = self.on_mqtt_message
-        
         try:
-            self.mqtt_client.connect(MQTT_HOST, MQTT_PORT)
+            self.mqtt_client = mqtt.Client()
+            
+            # Set credentials if provided (optional for testing)
+            if MQTT_USER and MQTT_PASSWORD:
+                self.mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+                logger.info(f"🔐 Using MQTT authentication for user: {MQTT_USER}")
+            else:
+                logger.info("🔓 Using anonymous MQTT connection")
+            
+            self.mqtt_client.on_connect = self.on_mqtt_connect
+            self.mqtt_client.on_message = self.on_mqtt_message
+            
+            # Set connection timeouts for faster failure detection
+            self.mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
             self.mqtt_client.loop_start()
+            logger.info(f"🔗 MQTT connection established to {MQTT_HOST}:{MQTT_PORT}")
             return True
+            
         except Exception as e:
-            logger.error(f"Could not connect to MQTT broker at {MQTT_HOST}:{MQTT_PORT}. Error: {e}")
+            logger.error(f"❌ Could not connect to MQTT broker at {MQTT_HOST}:{MQTT_PORT}")
+            logger.error(f"📄 Error details: {e}")
+            logger.warning("🔄 Continuing with reduced functionality (no entity discovery)")
+            self.mqtt_client = None
             return False
     
     def signal_handler(self, signum, frame):
@@ -270,10 +282,13 @@ class EnhancedAICleaner:
         signal.signal(signal.SIGINT, self.signal_handler)
         
         # Set up MQTT connection
-        if not self.setup_mqtt():
-            logger.warning("MQTT connection failed, continuing with reduced functionality")
+        mqtt_available = self.setup_mqtt()
+        if mqtt_available:
+            logger.info("✅ Full functionality available (MQTT + AI + Web UI)")
+        else:
+            logger.info("⚠️  Limited functionality (Web UI + AI only, no entity discovery)")
         
-        logger.info("Enhanced AICleaner V3 started successfully")
+        logger.info("🚀 Enhanced AICleaner V3 started successfully")
         
         # Main loop
         while self.running:
@@ -284,19 +299,34 @@ class EnhancedAICleaner:
                 
                 # Check configuration status
                 options = self.load_addon_options()
-                has_camera = bool(options.get('default_camera'))
-                has_todo = bool(options.get('default_todo_list'))
+                has_camera = bool(options.get('default_camera', '').strip())
+                has_todo = bool(options.get('default_todo_list', '').strip())
                 
                 if has_camera and has_todo:
                     # Perform AI cleaning tasks (placeholder for now)
                     if self.enabled and self.status not in ["error", "stopping"]:
-                        logger.debug(f"Processing with camera: {options['default_camera']}, todo: {options['default_todo_list']}")
+                        logger.debug(f"✅ Active monitoring: camera={options['default_camera']}, todo={options['default_todo_list']}")
                         await asyncio.sleep(30)  # Process every 30 seconds
                     else:
+                        logger.debug("⏸️  Addon disabled - monitoring paused")
                         await asyncio.sleep(5)   # Check more frequently when disabled
                 else:
-                    logger.info("Waiting for configuration - visit web interface to configure entities")
-                    await asyncio.sleep(10)  # Check configuration more frequently
+                    # Provide helpful configuration guidance
+                    missing = []
+                    if not has_camera:
+                        missing.append("camera entity")
+                    if not has_todo:
+                        missing.append("todo list entity")
+                    
+                    logger.info(f"⚙️  Configuration needed: missing {' and '.join(missing)}")
+                    logger.info("🌐 Please visit the web interface to configure entities")
+                    
+                    if self.mqtt_client:
+                        logger.debug("📡 MQTT available - entities will auto-register once configured")
+                    else:
+                        logger.debug("🔌 MQTT unavailable - manual entity configuration required")
+                    
+                    await asyncio.sleep(15)  # Check configuration less frequently
                     
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")

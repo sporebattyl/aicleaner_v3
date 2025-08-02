@@ -6,6 +6,37 @@
 
 bashio::log.info "Starting AICleaner V3 add-on..."
 
+# --- 0. ENVIRONMENT CHECK ---
+bashio::log.info "Checking addon environment..."
+
+# Check for /data/options.json - critical for addon configuration
+if [ ! -f /data/options.json ]; then
+    bashio::log.warning "Configuration file /data/options.json not found."
+    bashio::log.warning "This may occur during initial setup or development environment."
+    bashio::log.info "Creating default configuration file..."
+    
+    # Ensure /data directory exists
+    mkdir -p /data
+    
+    # Create default options.json with all required fields
+    cat > /data/options.json << 'EOF'
+{
+  "log_level": "info",
+  "device_id": "aicleaner_v3",
+  "primary_api_key": "",
+  "backup_api_keys": [],
+  "mqtt_discovery_prefix": "homeassistant",
+  "default_camera": "",
+  "default_todo_list": "",
+  "enable_zones": false,
+  "zones": [],
+  "debug_mode": false,
+  "auto_dashboard": true
+}
+EOF
+    bashio::log.info "✓ Default configuration created. Please configure via Home Assistant addon UI."
+fi
+
 # --- 1. VALIDATE CONFIGURATION ---
 bashio::log.info "Validating add-on configuration..."
 
@@ -44,9 +75,22 @@ if bashio::services.available "mqtt"; then
     export MQTT_PORT=$(bashio::services mqtt "port")
     export MQTT_USER=$(bashio::services mqtt "username")
     export MQTT_PASSWORD=$(bashio::services mqtt "password")
-    bashio::log.info "MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
+    bashio::log.info "✓ MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
+    bashio::log.info "✓ Entity discovery and MQTT features will be available"
 else
-    bashio::log.warning "MQTT service not available. Some features may not work."
+    bashio::log.warning "⚠️  MQTT service not available - entity discovery disabled"
+    bashio::log.warning "To enable full functionality, please set up MQTT integration:"
+    bashio::log.warning "1. Install 'Mosquitto broker' addon from Add-on Store"
+    bashio::log.warning "2. Configure username/password in Mosquitto addon"
+    bashio::log.warning "3. Add MQTT integration in Settings > Devices & Services"
+    bashio::log.warning "4. Restart this addon after MQTT setup is complete"
+    bashio::log.info "Addon will continue with reduced functionality..."
+    
+    # Set empty MQTT variables for Python application
+    export MQTT_HOST=""
+    export MQTT_PORT=""
+    export MQTT_USER=""
+    export MQTT_PASSWORD=""
 fi
 
 # --- 4. HOME ASSISTANT API ---
