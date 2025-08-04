@@ -70,10 +70,16 @@ export ANTHROPIC_API_KEY=""
 
 # --- 3. MQTT CONFIGURATION ---
 # Check for external MQTT broker configuration first
-if bashio::config.has_value 'mqtt_external_broker' && bashio::config.true 'mqtt_external_broker'; then
+MQTT_EXTERNAL=$(bashio::config 'mqtt_external_broker')
+bashio::log.debug "External MQTT broker setting: $MQTT_EXTERNAL"
+
+if [[ "${MQTT_EXTERNAL,,}" == "true" ]]; then
     # External MQTT broker configured
-    if bashio::config.has_value 'mqtt_host' && [ "$(bashio::config 'mqtt_host')" != "" ]; then
-        export MQTT_HOST=$(bashio::config 'mqtt_host')
+    MQTT_HOST_VALUE=$(bashio::config 'mqtt_host')
+    bashio::log.debug "External MQTT host value: $MQTT_HOST_VALUE"
+    
+    if [[ -n "$MQTT_HOST_VALUE" ]]; then
+        export MQTT_HOST="$MQTT_HOST_VALUE"
         export MQTT_PORT=$(bashio::config 'mqtt_port')
         export MQTT_USER=$(bashio::config 'mqtt_username')
         export MQTT_PASSWORD=$(bashio::config 'mqtt_password')
