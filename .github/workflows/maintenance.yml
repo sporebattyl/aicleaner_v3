@@ -127,7 +127,7 @@ jobs:
 
       - name: Run Bandit security linter
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           echo "🔍 Running Bandit security analysis..."
           bandit -r . -f json -o bandit-report.json -ll || true
           
@@ -145,7 +145,7 @@ jobs:
 
       - name: Run Semgrep analysis
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           echo "🔍 Running Semgrep static analysis..."
           semgrep --config=auto --json --output=semgrep-report.json . || true
           
@@ -186,14 +186,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install psutil memory-profiler
 
       - name: Performance baseline check
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           echo "📊 Running performance baseline checks..."
           
           python -c "
@@ -252,7 +252,7 @@ else:
 
       - name: Docker image size check
         run: |
-          cd aicleaner_v3
+          cd addons/aicleaner_v3
           echo "📦 Checking Docker image size..."
           
           # Build a test image

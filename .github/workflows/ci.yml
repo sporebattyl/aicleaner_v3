@@ -133,7 +133,7 @@ except Exception as e:
     needs: validate
     defaults:
       run:
-        working-directory: aicleaner_v3
+        working-directory: addons/aicleaner_v3
     
     strategy:
       matrix:
@@ -194,7 +194,7 @@ except Exception as e:
     needs: test
     defaults:
       run:
-        working-directory: aicleaner_v3
+        working-directory: addons/aicleaner_v3
         
     services:
       mosquitto:
@@ -302,7 +302,7 @@ except Exception as e:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     defaults:
       run:
-        working-directory: aicleaner_v3
+        working-directory: addons/aicleaner_v3
     
     steps:
     - name: Checkout code
