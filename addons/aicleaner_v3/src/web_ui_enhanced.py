@@ -8,6 +8,7 @@ import os
 import json
 import logging
 import aiohttp
+import asyncio
 from datetime import datetime
 from aiohttp import web, web_request
 from typing import Dict, Any, List
@@ -19,8 +20,28 @@ class EnhancedWebUI:
     
     def __init__(self, app_instance):
         self.app = app_instance
-        self.web_app = web.Application()
+        self.web_app = web.Application(middlewares=[self.json_error_middleware])
+        self.http_session = None
         self.setup_routes()
+    
+    @web.middleware
+    async def json_error_middleware(self, request, handler):
+        """Middleware to ensure API endpoints always return JSON, never HTML errors"""
+        try:
+            response = await handler(request)
+            return response
+        except Exception as e:
+            # Only apply JSON error handling to API routes
+            if request.path.startswith('/api/'):
+                logger.error(f"API endpoint error on {request.path}: {e}")
+                return web.json_response({
+                    'success': False,
+                    'error': str(e),
+                    'path': request.path
+                }, status=500)
+            else:
+                # For non-API routes, let the exception bubble up normally
+                raise
     
     def setup_routes(self):
         """Setup web routes"""
@@ -30,6 +51,18 @@ class EnhancedWebUI:
         self.web_app.router.add_get('/api/config', self.api_config)
         self.web_app.router.add_put('/api/config', self.api_update_config)
         self.web_app.router.add_get('/api/entities', self.api_entities)
+    
+    async def get_http_session(self):
+        """Get or create HTTP session for HA API calls"""
+        if self.http_session is None or self.http_session.closed:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            self.http_session = aiohttp.ClientSession(timeout=timeout)
+        return self.http_session
+    
+    async def cleanup_session(self):
+        """Cleanup HTTP session"""
+        if self.http_session and not self.http_session.closed:
+            await self.http_session.close()
     
     def load_addon_options(self) -> Dict[str, Any]:
         """Load current addon options from /data/options.json"""
@@ -527,31 +560,40 @@ class EnhancedWebUI:
             return web.json_response({'error': str(e), 'success': False}, status=500)
     
     async def api_test_generation(self, request: web_request.Request):
-        """API endpoint to test AI generation"""
+        """API endpoint to test AI generation with enhanced HA API testing"""
         try:
-            # Test HA API connectivity as well
+            # Test HA API connectivity with better error handling
             supervisor_token = os.getenv('SUPERVISOR_TOKEN')
+            ha_accessible = False
+            ha_error = None
+            
             if supervisor_token:
-                # Try a simple API call to verify connectivity
-                async with aiohttp.ClientSession() as session:
+                try:
+                    session = await self.get_http_session()
                     headers = {'Authorization': f'Bearer {supervisor_token}'}
                     async with session.get('http://supervisor/core/api/config', headers=headers) as response:
                         ha_accessible = response.status == 200
+                        if not ha_accessible:
+                            ha_error = f"HTTP {response.status}: {await response.text()}"
+                except Exception as e:
+                    ha_error = str(e)
             else:
-                ha_accessible = False
+                ha_error = "SUPERVISOR_TOKEN not available"
             
             return web.json_response({
                 'success': True,
-                'result': 'Test successful - Enhanced UI is working!',
+                'result': 'Enhanced UI test completed',
                 'ha_api_accessible': ha_accessible,
-                'supervisor_token_available': bool(supervisor_token)
+                'ha_error': ha_error,
+                'supervisor_token_available': bool(supervisor_token),
+                'timestamp': datetime.now().isoformat()
             })
         except Exception as e:
             logger.error(f"Error in api_test_generation: {e}")
-            # Always return JSON response
             return web.json_response({
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
             })
     
     async def api_config(self, request: web_request.Request):
@@ -612,23 +654,39 @@ class EnhancedWebUI:
             }, status=500)
     
     async def get_homeassistant_entities(self) -> Dict[str, Any]:
-        """Query Home Assistant API for all entities"""
+        """Query Home Assistant API for all entities with enhanced error handling"""
         supervisor_token = os.getenv('SUPERVISOR_TOKEN')
         if not supervisor_token:
-            raise Exception("SUPERVISOR_TOKEN not available")
+            raise Exception("SUPERVISOR_TOKEN not available - ensure hassio_api: true in config.yaml")
         
         headers = {
             'Authorization': f'Bearer {supervisor_token}',
             'Content-Type': 'application/json'
         }
         
-        async with aiohttp.ClientSession() as session:
+        session = await self.get_http_session()
+        
+        try:
             async with session.get('http://supervisor/core/api/states', headers=headers) as response:
                 if response.status == 200:
-                    return await response.json()
+                    data = await response.json()
+                    logger.info(f"Successfully fetched {len(data)} entities from HA API")
+                    return data
+                elif response.status == 401:
+                    raise Exception("HA API authentication failed - invalid SUPERVISOR_TOKEN")
+                elif response.status == 403:
+                    raise Exception("HA API access forbidden - check hassio_api permissions")
                 else:
                     error_text = await response.text()
-                    raise Exception(f"HA API call failed: {response.status} - {error_text}")
+                    raise Exception(f"HA API call failed: HTTP {response.status} - {error_text}")
+        except aiohttp.ClientConnectorError as e:
+            raise Exception(f"Cannot connect to Home Assistant API: {e}")
+        except aiohttp.ServerTimeoutError as e:
+            raise Exception(f"Home Assistant API timeout: {e}")
+        except asyncio.TimeoutError as e:
+            raise Exception(f"Home Assistant API request timeout: {e}")
+        except json.JSONDecodeError as e:
+            raise Exception(f"Invalid JSON response from Home Assistant API: {e}")
     
     async def api_entities(self, request: web_request.Request):
         """API endpoint to get Home Assistant entities with real HA API calls"""
@@ -687,3 +745,8 @@ class EnhancedWebUI:
         site = web.TCPSite(runner, host, port)
         await site.start()
         logger.info("Enhanced web UI server started successfully")
+    
+    async def shutdown(self):
+        """Cleanup resources on shutdown"""
+        await self.cleanup_session()
+        logger.info("Enhanced web UI resources cleaned up")

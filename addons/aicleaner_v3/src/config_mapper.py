@@ -20,6 +20,11 @@ def get_default_options() -> Dict[str, Any]:
         "primary_api_key": "",
         "backup_api_keys": [],
         "mqtt_discovery_prefix": "homeassistant",
+        "mqtt_external_broker": False,
+        "mqtt_host": "",
+        "mqtt_port": 1883,
+        "mqtt_username": "",
+        "mqtt_password": "",
         "default_camera": "",
         "default_todo_list": "",
         "enable_zones": False,
@@ -97,6 +102,11 @@ def create_user_config(options: Dict[str, Any]) -> Dict[str, Any]:
     primary_api_key = options.get("primary_api_key", defaults["primary_api_key"])
     backup_api_keys = options.get("backup_api_keys", defaults["backup_api_keys"])
     mqtt_discovery_prefix = options.get("mqtt_discovery_prefix", defaults["mqtt_discovery_prefix"])
+    mqtt_external_broker = options.get("mqtt_external_broker", defaults["mqtt_external_broker"])
+    mqtt_host = options.get("mqtt_host", defaults["mqtt_host"])
+    mqtt_port = options.get("mqtt_port", defaults["mqtt_port"])
+    mqtt_username = options.get("mqtt_username", defaults["mqtt_username"])
+    mqtt_password = options.get("mqtt_password", defaults["mqtt_password"])
     debug_mode = options.get("debug_mode", defaults["debug_mode"])
     auto_dashboard = options.get("auto_dashboard", defaults["auto_dashboard"])
     
@@ -127,6 +137,21 @@ def create_user_config(options: Dict[str, Any]) -> Dict[str, Any]:
             }
         }
     }
+    
+    # Add external MQTT broker configuration if enabled
+    if mqtt_external_broker and mqtt_host:
+        user_config["mqtt"]["broker"] = {
+            "host": mqtt_host,
+            "port": mqtt_port,
+            "external": True
+        }
+        
+        # Add authentication if provided
+        if mqtt_username or mqtt_password:
+            user_config["mqtt"]["broker"]["auth"] = {
+                "username": mqtt_username,
+                "password": mqtt_password
+            }
     
     # Add entity configuration
     if default_camera or default_todo_list or enable_zones:

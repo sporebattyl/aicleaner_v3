@@ -69,21 +69,39 @@ export OPENAI_API_KEY=""
 export ANTHROPIC_API_KEY=""
 
 # --- 3. MQTT CONFIGURATION ---
-# Home Assistant provides MQTT broker details when mqtt service is requested
-if bashio::services.available "mqtt"; then
+# Check for external MQTT broker configuration first
+if bashio::config.has_value 'mqtt_external_broker' && bashio::config.true 'mqtt_external_broker'; then
+    # External MQTT broker configured
+    if bashio::config.has_value 'mqtt_host' && [ "$(bashio::config 'mqtt_host')" != "" ]; then
+        export MQTT_HOST=$(bashio::config 'mqtt_host')
+        export MQTT_PORT=$(bashio::config 'mqtt_port')
+        export MQTT_USER=$(bashio::config 'mqtt_username')
+        export MQTT_PASSWORD=$(bashio::config 'mqtt_password')
+        bashio::log.info "✓ External MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
+        bashio::log.info "✓ Using external MQTT broker for entity discovery"
+    else
+        bashio::log.error "External MQTT enabled but mqtt_host not configured!"
+        bashio::exit.nok "Please configure mqtt_host in addon options"
+    fi
+elif bashio::services.available "mqtt"; then
+    # Home Assistant provides MQTT broker details when mqtt service is requested
     export MQTT_HOST=$(bashio::services mqtt "host")
     export MQTT_PORT=$(bashio::services mqtt "port")
     export MQTT_USER=$(bashio::services mqtt "username")
     export MQTT_PASSWORD=$(bashio::services mqtt "password")
-    bashio::log.info "✓ MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
+    bashio::log.info "✓ HA internal MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
     bashio::log.info "✓ Entity discovery and MQTT features will be available"
 else
     bashio::log.warning "⚠️  MQTT service not available - entity discovery disabled"
-    bashio::log.warning "To enable full functionality, please set up MQTT integration:"
-    bashio::log.warning "1. Install 'Mosquitto broker' addon from Add-on Store"
-    bashio::log.warning "2. Configure username/password in Mosquitto addon"
-    bashio::log.warning "3. Add MQTT integration in Settings > Devices & Services"
-    bashio::log.warning "4. Restart this addon after MQTT setup is complete"
+    bashio::log.warning "To enable full functionality, either:"
+    bashio::log.warning "Option 1 - Use HA Internal MQTT:"
+    bashio::log.warning "  1. Install 'Mosquitto broker' addon from Add-on Store"
+    bashio::log.warning "  2. Configure username/password in Mosquitto addon"
+    bashio::log.warning "  3. Add MQTT integration in Settings > Devices & Services"
+    bashio::log.warning "Option 2 - Use External MQTT:"
+    bashio::log.warning "  1. Enable 'mqtt_external_broker' in addon configuration"
+    bashio::log.warning "  2. Set mqtt_host, mqtt_port, mqtt_username, mqtt_password"
+    bashio::log.warning "  3. Restart this addon after MQTT setup is complete"
     bashio::log.info "Addon will continue with reduced functionality..."
     
     # Following HA addon best practices: don't export empty variables

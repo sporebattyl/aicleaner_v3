@@ -1,0 +1,18 @@
+{
+  "log_level": "info",
+  "device_id": "aicleaner_v3",
+  "primary_api_key": "",
+  "backup_api_keys": [],
+  "mqtt_discovery_prefix": "homeassistant",
+  "mqtt_external_broker": true,
+  "mqtt_host": "192.168.88.17",
+  "mqtt_port": 1883,
+  "mqtt_username": "drewcifer",
+  "mqtt_password": "Minds63qq!",
+  "default_camera": "",
+  "default_todo_list": "",
+  "enable_zones": false,
+  "zones": [],
+  "debug_mode": false,
+  "auto_dashboard": true
+}

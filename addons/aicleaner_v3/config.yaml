@@ -1,5 +1,5 @@
 name: "AICleaner V3"
-version: "1.1.5"
+version: "1.2.0"
 slug: "aicleaner_v3"
 description: "AI-powered cleaning task management with intelligent zone monitoring and automatic dashboard integration"
 url: "https://github.com/sporebattyl/aicleaner_v3/tree/main/aicleaner_v3"
@@ -35,8 +35,15 @@ options:
   primary_api_key: ""
   backup_api_keys: []
   
-  # MQTT Discovery (automatically configured via Home Assistant services)
+  # MQTT Configuration
   mqtt_discovery_prefix: "homeassistant"
+  
+  # External MQTT Broker (optional - for external MQTT setups)
+  mqtt_external_broker: false
+  mqtt_host: ""
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
   
   # Entity Selections (Basic Mode)
   default_camera: ""
@@ -59,8 +66,15 @@ schema:
   primary_api_key: "str?"
   backup_api_keys: "list(str)?"
   
-  # MQTT Discovery (auto-configured)
+  # MQTT Configuration
   mqtt_discovery_prefix: "str"
+  
+  # External MQTT Broker (optional)
+  mqtt_external_broker: "bool"
+  mqtt_host: "str?"
+  mqtt_port: "port?"
+  mqtt_username: "str?"
+  mqtt_password: "password?"
   
   # Entity Selections (Basic Mode) - Manual entity ID entry
   default_camera: "str?"

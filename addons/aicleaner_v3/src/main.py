@@ -236,11 +236,12 @@ class EnhancedAICleaner:
     def on_mqtt_connect(self, client, userdata, flags, rc):
         """MQTT connection callback"""
         if rc == 0:
-            logger.info("Connected to MQTT Broker!")
+            logger.info("✓ Successfully connected to MQTT Broker!")
             self.status = "connected"
             
             # Subscribe to command topic
             client.subscribe(f"aicleaner/{DEVICE_ID}/set")
+            logger.info(f"✓ Subscribed to command topic: aicleaner/{DEVICE_ID}/set")
             
             # Register entities and publish initial state
             self.register_entities()
@@ -248,9 +249,28 @@ class EnhancedAICleaner:
             
             self.status = "idle"
             self.publish_state()
+            logger.info("✓ MQTT initialization complete - entity discovery enabled")
         else:
-            logger.error(f"Failed to connect to MQTT, return code {rc}")
+            # More detailed error reporting
+            error_messages = {
+                1: "Connection refused - incorrect protocol version",
+                2: "Connection refused - invalid client identifier",
+                3: "Connection refused - server unavailable",
+                4: "Connection refused - bad username or password",
+                5: "Connection refused - not authorized"
+            }
+            error_msg = error_messages.get(rc, f"Unknown error code {rc}")
+            logger.error(f"❌ MQTT connection failed: {error_msg}")
             self.status = "error"
+    
+    def on_mqtt_disconnect(self, client, userdata, rc):
+        """MQTT disconnect callback"""
+        if rc != 0:
+            logger.warning(f"⚠️ Unexpected MQTT disconnection (code: {rc})")
+            logger.info("Will attempt to reconnect automatically...")
+        else:
+            logger.info("MQTT client disconnected gracefully")
+        self.status = "disconnected"
     
     def on_mqtt_message(self, client, userdata, msg):
         """MQTT message callback"""
@@ -264,11 +284,11 @@ class EnhancedAICleaner:
                 if payload == "ON":
                     self.enabled = True
                     self.status = "enabled"
-                    logger.info("AICleaner enabled via MQTT command")
+                    logger.info("✓ AICleaner enabled via MQTT command")
                 elif payload == "OFF":
                     self.enabled = False
                     self.status = "disabled"
-                    logger.info("AICleaner disabled via MQTT command")
+                    logger.info("⏸️ AICleaner disabled via MQTT command")
                 
                 self.publish_state()
                 
@@ -280,37 +300,66 @@ class EnhancedAICleaner:
         if not MQTT_HOST or MQTT_HOST.strip() == "":
             logger.warning("🔌 MQTT host not configured - entity discovery disabled")
             logger.info("📋 To enable MQTT features:")
-            logger.info("  1. Install 'Mosquitto broker' addon")
-            logger.info("  2. Configure MQTT integration in Home Assistant")
-            logger.info("  3. Restart this addon")
+            logger.info("  Option 1 - HA Internal MQTT:")
+            logger.info("    1. Install 'Mosquitto broker' addon")
+            logger.info("    2. Configure MQTT integration in Home Assistant")
+            logger.info("    3. Restart this addon")
+            logger.info("  Option 2 - External MQTT:")
+            logger.info("    1. Enable 'mqtt_external_broker' in addon config")
+            logger.info("    2. Set mqtt_host, mqtt_port, mqtt_username, mqtt_password")
+            logger.info("    3. Restart this addon")
             logger.info("🔄 Addon will continue with local functionality only")
             return False
         
-        try:
-            self.mqtt_client = mqtt.Client()
-            
-            # Set credentials if provided (optional for testing)
-            if MQTT_USER and MQTT_PASSWORD:
-                self.mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-                logger.info(f"🔐 Using MQTT authentication for user: {MQTT_USER}")
-            else:
-                logger.info("🔓 Using anonymous MQTT connection")
-            
-            self.mqtt_client.on_connect = self.on_mqtt_connect
-            self.mqtt_client.on_message = self.on_mqtt_message
-            
-            # Set connection timeouts for faster failure detection
-            self.mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
-            self.mqtt_client.loop_start()
-            logger.info(f"🔗 MQTT connection established to {MQTT_HOST}:{MQTT_PORT}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Could not connect to MQTT broker at {MQTT_HOST}:{MQTT_PORT}")
-            logger.error(f"📄 Error details: {e}")
-            logger.warning("🔄 Continuing with reduced functionality (no entity discovery)")
-            self.mqtt_client = None
-            return False
+        # Enhanced connection with retry logic
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"🔗 Attempting MQTT connection to {MQTT_HOST}:{MQTT_PORT} (attempt {attempt + 1}/{max_retries})")
+                
+                # Create new client for each attempt to avoid state issues
+                self.mqtt_client = mqtt.Client()
+                
+                # Set credentials if provided
+                if MQTT_USER and MQTT_PASSWORD:
+                    self.mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+                    logger.info(f"🔐 Using MQTT authentication for user: {MQTT_USER}")
+                else:
+                    logger.info("🔓 Using anonymous MQTT connection")
+                
+                self.mqtt_client.on_connect = self.on_mqtt_connect
+                self.mqtt_client.on_message = self.on_mqtt_message
+                self.mqtt_client.on_disconnect = self.on_mqtt_disconnect
+                
+                # Set connection timeouts for faster failure detection
+                self.mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
+                self.mqtt_client.loop_start()
+                
+                logger.info(f"✓ MQTT connection established to {MQTT_HOST}:{MQTT_PORT}")
+                return True
+                
+            except ConnectionRefusedError as e:
+                logger.error(f"❌ Connection refused to MQTT broker at {MQTT_HOST}:{MQTT_PORT}")
+                logger.error(f"Please verify the broker is running and accessible")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+            except Exception as e:
+                logger.error(f"❌ MQTT connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+        
+        logger.error(f"❌ All MQTT connection attempts failed to {MQTT_HOST}:{MQTT_PORT}")
+        logger.warning("🔄 Continuing with reduced functionality (no entity discovery)")
+        self.mqtt_client = None
+        return False
     
     def signal_handler(self, signum, frame):
         """Handle shutdown signals"""
@@ -320,6 +369,9 @@ class EnhancedAICleaner:
         if self.mqtt_client:
             self.publish_state()
             self.mqtt_client.disconnect()
+        # Cleanup web UI resources
+        if self.web_ui:
+            asyncio.create_task(self.web_ui.shutdown())
     
     async def start_web_ui(self):
         """Start the enhanced web UI server"""
@@ -393,6 +445,10 @@ class EnhancedAICleaner:
                 logger.error(f"Error in main loop: {e}")
                 self.status = "error"
                 await asyncio.sleep(10)
+        
+        # Cleanup resources before stopping
+        if self.web_ui:
+            await self.web_ui.shutdown()
         
         logger.info("Enhanced AICleaner V3 stopped")
         return True
