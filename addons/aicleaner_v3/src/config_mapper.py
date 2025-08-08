@@ -8,8 +8,13 @@ import json
 import yaml
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import Dict, Any, List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
 
 
 def get_default_options() -> Dict[str, Any]:
@@ -38,82 +43,82 @@ def load_addon_options() -> Dict[str, Any]:
     options_file = Path("/data/options.json")
     defaults = get_default_options()
     
-    print(f"[CONFIG_MAPPER] Loading configuration from {options_file}")
+    logger.info(f"[CONFIG_MAPPER] Loading configuration from {options_file}")
     
     if not options_file.exists():
-        print(f"[CONFIG_MAPPER] WARNING: Configuration file {options_file} not found")
-        print(f"[CONFIG_MAPPER] Using default configuration")
+        logger.warning(f"[CONFIG_MAPPER] WARNING: Configuration file {options_file} not found")
+        logger.info(f"[CONFIG_MAPPER] Using default configuration")
         return defaults
     
     # Check file size and readability
     file_size = options_file.stat().st_size
-    print(f"[CONFIG_MAPPER] Configuration file found, size: {file_size} bytes")
+    logger.info(f"[CONFIG_MAPPER] Configuration file found, size: {file_size} bytes")
     
     if file_size == 0:
-        print(f"[CONFIG_MAPPER] ERROR: Configuration file is empty")
-        print(f"[CONFIG_MAPPER] Using default configuration")
+        logger.error(f"[CONFIG_MAPPER] ERROR: Configuration file is empty")
+        logger.info(f"[CONFIG_MAPPER] Using default configuration")
         return defaults
     
     try:
         with open(options_file, 'r') as f:
             file_content = f.read()
-            print(f"[CONFIG_MAPPER] File content length: {len(file_content)} characters")
+            logger.info(f"[CONFIG_MAPPER] File content length: {len(file_content)} characters")
             
             # Show first 200 chars for debugging (redacted)
             preview = file_content[:200].replace('"api_key":', '"***"').replace('"password":', '"***"')
-            print(f"[CONFIG_MAPPER] Content preview: {preview}{'...' if len(file_content) > 200 else ''}")
+            logger.info(f"[CONFIG_MAPPER] Content preview: {preview}{'...' if len(file_content) > 200 else ''}")
             
             loaded_options = json.loads(file_content)
-            print(f"[CONFIG_MAPPER] Successfully parsed JSON with {len(loaded_options)} keys")
+            logger.info(f"[CONFIG_MAPPER] Successfully parsed JSON with {len(loaded_options)} keys")
             
             # Log which options were found vs missing
             for key in defaults.keys():
                 if key in loaded_options:
                     if key not in ['primary_api_key', 'backup_api_keys', 'mqtt_password']:
-                        print(f"[CONFIG_MAPPER]   ✓ {key}: {loaded_options[key]}")
+                        logger.info(f"[CONFIG_MAPPER]   ✓ {key}: {loaded_options[key]}")
                     else:
-                        print(f"[CONFIG_MAPPER]   ✓ {key}: ***REDACTED***")
+                        logger.info(f"[CONFIG_MAPPER]   ✓ {key}: ***REDACTED***")
                 else:
-                    print(f"[CONFIG_MAPPER]   ⚠️  {key}: missing, will use default ({defaults[key]})")
+                    logger.info(f"[CONFIG_MAPPER]   ⚠️  {key}: missing, will use default ({defaults[key]})")
             
             # Check for unexpected keys
             extra_keys = set(loaded_options.keys()) - set(defaults.keys())
             if extra_keys:
-                print(f"[CONFIG_MAPPER] Extra keys found (will be ignored): {list(extra_keys)}")
+                logger.info(f"[CONFIG_MAPPER] Extra keys found (will be ignored): {list(extra_keys)}")
             
             # Validate specific problematic fields
             if 'backup_api_keys' in loaded_options:
                 backup_keys = loaded_options['backup_api_keys']
                 if not isinstance(backup_keys, list):
-                    print(f"[CONFIG_MAPPER] ERROR: backup_api_keys is not a list: {type(backup_keys)} = {backup_keys}")
-                    print(f"[CONFIG_MAPPER] Converting to empty list")
+                    logger.info(f"[CONFIG_MAPPER] ERROR: backup_api_keys is not a list: {type(backup_keys)} = {backup_keys}")
+                    logger.info(f"[CONFIG_MAPPER] Converting to empty list")
                     loaded_options['backup_api_keys'] = []
                 elif backup_keys == ["str"] or "str" in backup_keys:
-                    print(f"[CONFIG_MAPPER] ERROR: backup_api_keys contains literal 'str' value")
-                    print(f"[CONFIG_MAPPER] This should be [] (empty array) or actual API keys")
+                    logger.info(f"[CONFIG_MAPPER] ERROR: backup_api_keys contains literal 'str' value")
+                    logger.info(f"[CONFIG_MAPPER] This should be [] (empty array) or actual API keys")
                     loaded_options['backup_api_keys'] = []
         
             # Merge loaded options with defaults to ensure all keys exist
             merged_options = defaults.copy()
             merged_options.update(loaded_options)
             
-            print(f"[CONFIG_MAPPER] Configuration loaded successfully with {len(merged_options)} final options")
+            logger.info(f"[CONFIG_MAPPER] Configuration loaded successfully with {len(merged_options)} final options")
             return merged_options
         
     except json.JSONDecodeError as e:
-        print(f"[CONFIG_MAPPER] ERROR: JSON parsing failed: {e}")
-        print(f"[CONFIG_MAPPER] File content that failed to parse (first 500 chars):")
+        logger.info(f"[CONFIG_MAPPER] ERROR: JSON parsing failed: {e}")
+        logger.info(f"[CONFIG_MAPPER] File content that failed to parse (first 500 chars):")
         try:
             with open(options_file, 'r') as f:
                 content = f.read(500)
-                print(f"[CONFIG_MAPPER] {repr(content)}")
+                logger.info(f"[CONFIG_MAPPER] {repr(content)}")
         except Exception:
-            print(f"[CONFIG_MAPPER] Could not read file content for debugging")
-        print(f"[CONFIG_MAPPER] Using default configuration")
+            logger.info(f"[CONFIG_MAPPER] Could not read file content for debugging")
+        logger.info(f"[CONFIG_MAPPER] Using default configuration")
         return defaults
     except Exception as e:
-        print(f"[CONFIG_MAPPER] ERROR: Unexpected error loading configuration: {e}")
-        print(f"[CONFIG_MAPPER] Using default configuration")
+        logger.info(f"[CONFIG_MAPPER] ERROR: Unexpected error loading configuration: {e}")
+        logger.info(f"[CONFIG_MAPPER] Using default configuration")
         return defaults
 
 
@@ -260,27 +265,27 @@ def create_user_config(options: Dict[str, Any]) -> Dict[str, Any]:
 def write_user_config(config: Dict[str, Any], target_path: str = "/app/src/app_config.user.yaml"):
     """Write user configuration to YAML file."""
     
-    print(f"[CONFIG_MAPPER] Writing user configuration to {target_path}")
+    logger.info(f"[CONFIG_MAPPER] Writing user configuration to {target_path}")
     
     try:
         # Ensure directory exists
         target_dir = Path(target_path).parent
-        print(f"[CONFIG_MAPPER] Ensuring directory exists: {target_dir}")
+        logger.info(f"[CONFIG_MAPPER] Ensuring directory exists: {target_dir}")
         target_dir.mkdir(parents=True, exist_ok=True)
         
         # Validate configuration structure before writing
         if not isinstance(config, dict):
-            print(f"[CONFIG_MAPPER] ERROR: Configuration is not a dict: {type(config)}")
+            logger.info(f"[CONFIG_MAPPER] ERROR: Configuration is not a dict: {type(config)}")
             sys.exit(1)
         
-        print(f"[CONFIG_MAPPER] Configuration structure summary:")
+        logger.info(f"[CONFIG_MAPPER] Configuration structure summary:")
         for key, value in config.items():
             if isinstance(value, dict):
-                print(f"[CONFIG_MAPPER]   {key}: dict with {len(value)} keys")
+                logger.info(f"[CONFIG_MAPPER]   {key}: dict with {len(value)} keys")
             elif isinstance(value, list):
-                print(f"[CONFIG_MAPPER]   {key}: list with {len(value)} items")
+                logger.info(f"[CONFIG_MAPPER]   {key}: list with {len(value)} items")
             else:
-                print(f"[CONFIG_MAPPER]   {key}: {type(value).__name__}")
+                logger.info(f"[CONFIG_MAPPER]   {key}: {type(value).__name__}")
         
         # Write configuration with header
         with open(target_path, 'w') as f:
@@ -297,91 +302,91 @@ def write_user_config(config: Dict[str, Any], target_path: str = "/app/src/app_c
         # Verify file was written successfully
         if Path(target_path).exists():
             file_size = Path(target_path).stat().st_size
-            print(f"[CONFIG_MAPPER] ✓ Configuration file written successfully ({file_size} bytes)")
+            logger.info(f"[CONFIG_MAPPER] ✓ Configuration file written successfully ({file_size} bytes)")
         else:
-            print(f"[CONFIG_MAPPER] ERROR: Configuration file was not created")
+            logger.info(f"[CONFIG_MAPPER] ERROR: Configuration file was not created")
             sys.exit(1)
             
     except yaml.YAMLError as e:
-        print(f"[CONFIG_MAPPER] ERROR: YAML serialization failed: {e}")
-        print(f"[CONFIG_MAPPER] Configuration structure that failed:")
-        print(f"[CONFIG_MAPPER] {config}")
+        logger.info(f"[CONFIG_MAPPER] ERROR: YAML serialization failed: {e}")
+        logger.info(f"[CONFIG_MAPPER] Configuration structure that failed:")
+        logger.info(f"[CONFIG_MAPPER] {config}")
         sys.exit(1)
     except OSError as e:
-        print(f"[CONFIG_MAPPER] ERROR: File system error: {e}")
-        print(f"[CONFIG_MAPPER] Target path: {target_path}")
-        print(f"[CONFIG_MAPPER] Target directory: {target_dir}")
+        logger.info(f"[CONFIG_MAPPER] ERROR: File system error: {e}")
+        logger.info(f"[CONFIG_MAPPER] Target path: {target_path}")
+        logger.info(f"[CONFIG_MAPPER] Target directory: {target_dir}")
         sys.exit(1)
     except Exception as e:
-        print(f"[CONFIG_MAPPER] ERROR: Unexpected error writing configuration: {e}")
-        print(f"[CONFIG_MAPPER] Configuration: {config}")
+        logger.info(f"[CONFIG_MAPPER] ERROR: Unexpected error writing configuration: {e}")
+        logger.info(f"[CONFIG_MAPPER] Configuration: {config}")
         sys.exit(1)
 
 
 def main():
     """Main configuration mapping function."""
     
-    print(f"[CONFIG_MAPPER] ========================================")
-    print(f"[CONFIG_MAPPER] AICleaner V3 Configuration Mapper")
-    print(f"[CONFIG_MAPPER] ========================================")
+    logger.info(f"[CONFIG_MAPPER] ========================================")
+    logger.info(f"[CONFIG_MAPPER] AICleaner V3 Configuration Mapper")
+    logger.info(f"[CONFIG_MAPPER] ========================================")
     
     try:
         # Load addon options
-        print(f"[CONFIG_MAPPER] Step 1: Loading addon options...")
+        logger.info(f"[CONFIG_MAPPER] Step 1: Loading addon options...")
         options = load_addon_options()
         
         if not options:
-            print(f"[CONFIG_MAPPER] ERROR: No options loaded")
+            logger.info(f"[CONFIG_MAPPER] ERROR: No options loaded")
             sys.exit(1)
         
         # Validate critical options
-        print(f"[CONFIG_MAPPER] Step 2: Validating critical configuration...")
+        logger.info(f"[CONFIG_MAPPER] Step 2: Validating critical configuration...")
         required_keys = ["device_id", "log_level", "mqtt_discovery_prefix"]
         for key in required_keys:
             if key not in options or not options[key]:
-                print(f"[CONFIG_MAPPER] ERROR: Required key '{key}' is missing or empty")
+                logger.info(f"[CONFIG_MAPPER] ERROR: Required key '{key}' is missing or empty")
                 sys.exit(1)
         
         # Create user configuration
-        print(f"[CONFIG_MAPPER] Step 3: Creating internal user configuration...")
+        logger.info(f"[CONFIG_MAPPER] Step 3: Creating internal user configuration...")
         user_config = create_user_config(options)
         
         if not user_config:
-            print(f"[CONFIG_MAPPER] ERROR: Failed to create user configuration")
+            logger.info(f"[CONFIG_MAPPER] ERROR: Failed to create user configuration")
             sys.exit(1)
         
-        print(f"[CONFIG_MAPPER] Generated configuration sections:")
+        logger.info(f"[CONFIG_MAPPER] Generated configuration sections:")
         for section in user_config.keys():
-            print(f"[CONFIG_MAPPER]   - {section}")
+            logger.info(f"[CONFIG_MAPPER]   - {section}")
         
         # Validate that we have essential configuration
         if "general" not in user_config:
-            print(f"[CONFIG_MAPPER] ERROR: Missing 'general' section in configuration")
+            logger.info(f"[CONFIG_MAPPER] ERROR: Missing 'general' section in configuration")
             sys.exit(1)
         
         if "mqtt" not in user_config:
-            print(f"[CONFIG_MAPPER] ERROR: Missing 'mqtt' section in configuration")
+            logger.info(f"[CONFIG_MAPPER] ERROR: Missing 'mqtt' section in configuration")
             sys.exit(1)
         
         # Write user configuration
-        print(f"[CONFIG_MAPPER] Step 4: Writing configuration to file...")
+        logger.info(f"[CONFIG_MAPPER] Step 4: Writing configuration to file...")
         write_user_config(user_config)
         
-        print(f"[CONFIG_MAPPER] ========================================")
-        print(f"[CONFIG_MAPPER] Configuration mapping completed successfully!")
-        print(f"[CONFIG_MAPPER] ========================================")
+        logger.info(f"[CONFIG_MAPPER] ========================================")
+        logger.info(f"[CONFIG_MAPPER] Configuration mapping completed successfully!")
+        logger.info(f"[CONFIG_MAPPER] ========================================")
         
     except KeyboardInterrupt:
-        print(f"[CONFIG_MAPPER] Configuration mapping interrupted by user")
+        logger.info(f"[CONFIG_MAPPER] Configuration mapping interrupted by user")
         sys.exit(130)
     except SystemExit:
         # Re-raise SystemExit (from sys.exit calls)
         raise
     except Exception as e:
-        print(f"[CONFIG_MAPPER] ========================================")
-        print(f"[CONFIG_MAPPER] FATAL ERROR in configuration mapping:")
-        print(f"[CONFIG_MAPPER] {type(e).__name__}: {e}")
-        print(f"[CONFIG_MAPPER] ========================================")
+        logger.info(f"[CONFIG_MAPPER] ========================================")
+        logger.info(f"[CONFIG_MAPPER] FATAL ERROR in configuration mapping:")
+        logger.info(f"[CONFIG_MAPPER] {type(e).__name__}: {e}")
+        logger.info(f"[CONFIG_MAPPER] ========================================")
         import traceback
         traceback.print_exc()
         sys.exit(1)

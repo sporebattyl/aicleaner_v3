@@ -80,7 +80,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Configuration from environment variables with comprehensive validation
-print("[MAIN] Loading configuration from environment variables...")
+logger.info("[MAIN] Loading configuration from environment variables...")
 
 # Debug: Show all environment variables for configuration debugging
 config_env_vars = [
@@ -89,38 +89,38 @@ config_env_vars = [
     "DEBUG_MODE", "AUTO_DASHBOARD", "SUPERVISOR_TOKEN", "HOMEASSISTANT_API"
 ]
 
-print("[MAIN] Environment variables status:")
+logger.info("[MAIN] Environment variables status:")
 for var in config_env_vars:
     value = os.getenv(var)
     if var in ["PRIMARY_API_KEY", "BACKUP_API_KEYS", "MQTT_PASSWORD", "SUPERVISOR_TOKEN"]:
-        print(f"[MAIN]   {var}: {'***SET***' if value else '***NOT SET***'}")
+        logger.info(f"[MAIN]   {var}: {'***SET***' if value else '***NOT SET***'}")
     else:
-        print(f"[MAIN]   {var}: {value if value else '***NOT SET***'}")
+        logger.info(f"[MAIN]   {var}: {value if value else '***NOT SET***'}")
 
 # Configuration loading with validation
 PRIMARY_API_KEY = os.getenv("PRIMARY_API_KEY")
 if PRIMARY_API_KEY:
-    print(f"[MAIN] ✓ Primary API key loaded (length: {len(PRIMARY_API_KEY)})")
+    logger.info(f"[MAIN] ✓ Primary API key loaded (length: {len(PRIMARY_API_KEY)})")
 else:
-    print("[MAIN] ⚠️  No primary API key - will use Ollama fallback")
+    logger.info("[MAIN] ⚠️  No primary API key - will use Ollama fallback")
 
 BACKUP_API_KEYS = get_json_env("BACKUP_API_KEYS", "[]")
 if isinstance(BACKUP_API_KEYS, list) and len(BACKUP_API_KEYS) > 0:
-    print(f"[MAIN] ✓ Backup API keys loaded: {len(BACKUP_API_KEYS)} keys")
+    logger.info(f"[MAIN] ✓ Backup API keys loaded: {len(BACKUP_API_KEYS)} keys")
 else:
-    print("[MAIN] ℹ️  No backup API keys configured")
+    logger.info("[MAIN] ℹ️  No backup API keys configured")
 
 DEVICE_ID = os.getenv("DEVICE_ID", "aicleaner_v3")
 if DEVICE_ID:
-    print(f"[MAIN] ✓ Device ID: {DEVICE_ID}")
+    logger.info(f"[MAIN] ✓ Device ID: {DEVICE_ID}")
 else:
-    print("[MAIN] ❌ Device ID is empty - this will cause issues")
+    logger.info("[MAIN] ❌ Device ID is empty - this will cause issues")
 
 DISCOVERY_PREFIX = os.getenv("MQTT_DISCOVERY_PREFIX", "homeassistant")
 if DISCOVERY_PREFIX:
-    print(f"[MAIN] ✓ MQTT Discovery Prefix: {DISCOVERY_PREFIX}")
+    logger.info(f"[MAIN] ✓ MQTT Discovery Prefix: {DISCOVERY_PREFIX}")
 else:
-    print("[MAIN] ❌ MQTT Discovery Prefix is empty")
+    logger.info("[MAIN] ❌ MQTT Discovery Prefix is empty")
 
 # MQTT Configuration - robust handling for when MQTT service unavailable
 MQTT_HOST = get_str_env("MQTT_HOST")
@@ -130,31 +130,31 @@ MQTT_PASSWORD = get_str_env("MQTT_PASSWORD")
 
 # Log MQTT configuration status with detailed validation
 if MQTT_HOST:
-    print(f"[MAIN] ✓ MQTT broker configured: {MQTT_HOST}:{MQTT_PORT}")
+    logger.info(f"[MAIN] ✓ MQTT broker configured: {MQTT_HOST}:{MQTT_PORT}")
     if MQTT_USER:
-        print(f"[MAIN] ✓ MQTT authentication configured for user: {MQTT_USER}")
+        logger.info(f"[MAIN] ✓ MQTT authentication configured for user: {MQTT_USER}")
     else:
-        print("[MAIN] ℹ️  MQTT using anonymous connection")
+        logger.info("[MAIN] ℹ️  MQTT using anonymous connection")
 else:
-    print("[MAIN] ⚠️  MQTT broker not configured - entity discovery disabled")
+    logger.info("[MAIN] ⚠️  MQTT broker not configured - entity discovery disabled")
 
 # Home Assistant API validation
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN")
 HOMEASSISTANT_API = os.getenv("HOMEASSISTANT_API", "http://supervisor/core/api")
 
 if SUPERVISOR_TOKEN:
-    print(f"[MAIN] ✓ Home Assistant API access available")
-    print(f"[MAIN]   API endpoint: {HOMEASSISTANT_API}")
+    logger.info(f"[MAIN] ✓ Home Assistant API access available")
+    logger.info(f"[MAIN]   API endpoint: {HOMEASSISTANT_API}")
 else:
-    print("[MAIN] ❌ SUPERVISOR_TOKEN not available - Home Assistant API access limited")
+    logger.info("[MAIN] ❌ SUPERVISOR_TOKEN not available - Home Assistant API access limited")
 
 # Configuration summary
-print("[MAIN] Configuration summary:")
-print(f"[MAIN]   - AI Provider: {'Cloud API' if PRIMARY_API_KEY else 'Local Ollama'}")
-print(f"[MAIN]   - MQTT: {'Enabled' if MQTT_HOST else 'Disabled'}")
-print(f"[MAIN]   - HA API: {'Available' if SUPERVISOR_TOKEN else 'Limited'}")
-print(f"[MAIN]   - Device ID: {DEVICE_ID}")
-print(f"[MAIN]   - Discovery Prefix: {DISCOVERY_PREFIX}")
+logger.info("[MAIN] Configuration summary:")
+logger.info(f"[MAIN]   - AI Provider: {'Cloud API' if PRIMARY_API_KEY else 'Local Ollama'}")
+logger.info(f"[MAIN]   - MQTT: {'Enabled' if MQTT_HOST else 'Disabled'}")
+logger.info(f"[MAIN]   - HA API: {'Available' if SUPERVISOR_TOKEN else 'Limited'}")
+logger.info(f"[MAIN]   - Device ID: {DEVICE_ID}")
+logger.info(f"[MAIN]   - Discovery Prefix: {DISCOVERY_PREFIX}")
 
 # Configuration validation warnings
 config_warnings = []
@@ -166,11 +166,11 @@ if not SUPERVISOR_TOKEN:
     config_warnings.append("No HA API access - limited functionality")
 
 if config_warnings:
-    print("[MAIN] Configuration warnings:")
+    logger.info("[MAIN] Configuration warnings:")
     for warning in config_warnings:
-        print(f"[MAIN]   ⚠️  {warning}")
+        logger.info(f"[MAIN]   ⚠️  {warning}")
 else:
-    print("[MAIN] ✓ All major configuration components are available")
+    logger.info("[MAIN] ✓ All major configuration components are available")
 
 class EnhancedAICleaner:
     """Enhanced AICleaner application class with web UI"""
