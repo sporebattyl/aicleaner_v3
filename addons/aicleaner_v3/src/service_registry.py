@@ -7,6 +7,7 @@ import abc
 import asyncio
 import collections
 import logging
+import time
 from typing import Dict, List, Optional, Set, Tuple, Type, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class ReloadContext:
         self.version = version
         self.status = status  # e.g., "pending", "validating", "applying", "completed", "failed"
         self.errors = errors if errors is not None else []
-        self.start_time = asyncio.get_event_loop().time() # Use loop time for consistency
+        self.start_time = time.time() # Use thread-safe time for consistency
 
     def add_error(self, error_message: str):
         self.errors.append(error_message)

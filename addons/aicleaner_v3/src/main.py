@@ -9,6 +9,7 @@ import json
 import logging
 import signal
 import sys
+import time
 import asyncio
 from typing import Dict, Any, List
 import paho.mqtt.client as mqtt
@@ -307,14 +308,14 @@ class EnhancedAICleaner:
         state = {
             "status": self.status,
             "enabled": "ON" if self.enabled else "OFF",
-            "timestamp": str(asyncio.get_event_loop().time())
+            "timestamp": str(time.time())
         }
         
         config_state = {
             "status": "configured" if options.get('default_camera') and options.get('default_todo_list') else "needs_configuration",
             "camera": options.get('default_camera', ''),
             "todo_list": options.get('default_todo_list', ''),
-            "timestamp": str(asyncio.get_event_loop().time())
+            "timestamp": str(time.time())
         }
         
         self.mqtt_client.publish(

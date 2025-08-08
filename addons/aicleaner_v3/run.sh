@@ -111,9 +111,19 @@ fi
 
 # Validate device ID format
 DEVICE_ID=$(bashio::config 'device_id')
+bashio::log.info "🔍 DEBUG: Raw device_id from bashio: '$DEVICE_ID'"
+
+# Handle null/empty device_id
+if [[ "$DEVICE_ID" == "null" || -z "$DEVICE_ID" || "$DEVICE_ID" == "" ]]; then
+    bashio::log.warning "Device ID is null/empty, using default: aicleaner_v3"
+    DEVICE_ID="aicleaner_v3"
+fi
+
 if [[ ! "$DEVICE_ID" =~ ^[a-zA-Z0-9_]+$ ]]; then
   bashio::exit.fatal "Device ID must contain only letters, numbers, and underscores."
 fi
+
+bashio::log.info "✓ Device ID validated: '$DEVICE_ID'"
 
 # --- 2. EXPORT CONFIGURATION ---
 # The Python application will read configuration from environment variables
