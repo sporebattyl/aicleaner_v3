@@ -29,16 +29,67 @@ class EnhancedWebUI:
         """Middleware to ensure API endpoints always return JSON, never HTML errors"""
         try:
             response = await handler(request)
+            
+            # For API routes, validate that the response is actually JSON
+            if request.path.startswith('/api/'):
+                content_type = response.headers.get('Content-Type', '')
+                if not content_type.startswith('application/json'):
+                    logger.warning(f"[WEB_UI] API endpoint {request.path} returned non-JSON content-type: {content_type}")
+                    
+                    # Try to read and validate the response body
+                    try:
+                        if hasattr(response, 'text'):
+                            body = await response.text()
+                        else:
+                            body = str(response.body) if response.body else ''
+                        
+                        # Check if body looks like JSON
+                        import json
+                        if body:
+                            json.loads(body)  # Will raise if not valid JSON
+                            logger.info(f"[WEB_UI] Response body is valid JSON despite content-type")
+                        else:
+                            logger.warning(f"[WEB_UI] Empty response body for {request.path}")
+                            
+                    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError) as parse_error:
+                        logger.error(f"[WEB_UI] Invalid JSON response from {request.path}: {parse_error}")
+                        # Return a safe JSON error response
+                        return web.json_response({
+                            'success': False,
+                            'error': 'Invalid JSON response generated',
+                            'path': request.path,
+                            'original_content_type': content_type
+                        }, status=500)
+            
             return response
+            
         except Exception as e:
             # Only apply JSON error handling to API routes
             if request.path.startswith('/api/'):
-                logger.error(f"API endpoint error on {request.path}: {e}")
-                return web.json_response({
+                logger.error(f"[WEB_UI] API endpoint error on {request.path}: {type(e).__name__}: {e}")
+                
+                # Create safe error response with comprehensive error info
+                error_response = {
                     'success': False,
                     'error': str(e),
-                    'path': request.path
-                }, status=500)
+                    'error_type': type(e).__name__,
+                    'path': request.path,
+                    'method': request.method
+                }
+                
+                # Ensure error response can be JSON serialized
+                try:
+                    import json
+                    json.dumps(error_response)
+                    return web.json_response(error_response, status=500)
+                except (TypeError, ValueError) as json_error:
+                    logger.error(f"[WEB_UI] Error response serialization failed: {json_error}")
+                    # Ultra-safe fallback
+                    return web.json_response({
+                        'success': False,
+                        'error': 'Serialization error in error handler',
+                        'path': request.path
+                    }, status=500)
             else:
                 # For non-API routes, let the exception bubble up normally
                 raise
@@ -689,47 +740,108 @@ class EnhancedWebUI:
     async def api_entities(self, request: web_request.Request):
         """API endpoint to get Home Assistant entities with real HA API calls"""
         try:
+            logger.info("[WEB_UI] Starting entity fetch from Home Assistant API")
+            
             # Get all entities from Home Assistant
             all_entities = await self.get_homeassistant_entities()
+            
+            if not isinstance(all_entities, list):
+                logger.error(f"[WEB_UI] Invalid entity data type: {type(all_entities)}")
+                return web.json_response({
+                    'cameras': [],
+                    'todo_lists': [],
+                    'success': False,
+                    'error': 'Invalid entity data format from Home Assistant API',
+                    'total_entities': 0
+                }, status=500)
+            
+            logger.info(f"[WEB_UI] Retrieved {len(all_entities)} entities from HA API")
             
             # Filter for cameras and todo lists
             cameras = []
             todo_lists = []
             
             for entity in all_entities:
-                entity_id = entity.get('entity_id', '')
-                domain = entity_id.split('.')[0] if '.' in entity_id else ''
-                
-                if domain == 'camera':
-                    cameras.append({
-                        'entity_id': entity_id,
-                        'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
-                        'state': entity.get('state', 'unknown')
-                    })
-                elif domain == 'todo':
-                    todo_lists.append({
-                        'entity_id': entity_id,
-                        'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
-                        'state': entity.get('state', 'unknown')
-                    })
+                try:
+                    entity_id = entity.get('entity_id', '')
+                    if not entity_id:
+                        continue
+                        
+                    domain = entity_id.split('.')[0] if '.' in entity_id else ''
+                    
+                    if domain == 'camera':
+                        cameras.append({
+                            'entity_id': entity_id,
+                            'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
+                            'state': entity.get('state', 'unknown')
+                        })
+                    elif domain == 'todo':
+                        todo_lists.append({
+                            'entity_id': entity_id,
+                            'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
+                            'state': entity.get('state', 'unknown')
+                        })
+                except Exception as entity_error:
+                    logger.warning(f"[WEB_UI] Error processing entity {entity.get('entity_id', 'unknown')}: {entity_error}")
+                    continue
             
-            return web.json_response({
+            logger.info(f"[WEB_UI] Filtered entities: {len(cameras)} cameras, {len(todo_lists)} todo lists")
+            
+            # Ensure we always return valid JSON structure
+            response_data = {
                 'cameras': cameras,
                 'todo_lists': todo_lists,
                 'success': True,
-                'total_entities': len(all_entities)
-            })
+                'total_entities': len(all_entities),
+                'filtered_count': {
+                    'cameras': len(cameras),
+                    'todo_lists': len(todo_lists)
+                }
+            }
+            
+            # Validate response can be JSON serialized
+            try:
+                import json
+                json.dumps(response_data)
+            except (TypeError, ValueError) as json_error:
+                logger.error(f"[WEB_UI] Response data is not JSON serializable: {json_error}")
+                return web.json_response({
+                    'cameras': [],
+                    'todo_lists': [],
+                    'success': False,
+                    'error': 'Response data serialization error',
+                    'total_entities': 0
+                }, status=500)
+            
+            return web.json_response(response_data)
             
         except Exception as e:
-            logger.error(f"Error in api_entities: {e}")
-            # Always return JSON, never HTML error pages
-            return web.json_response({
+            logger.error(f"[WEB_UI] Critical error in api_entities: {type(e).__name__}: {e}")
+            # Always return properly formatted JSON, never let exceptions create HTML responses
+            error_response = {
                 'cameras': [],
                 'todo_lists': [],
                 'success': False,
                 'error': str(e),
+                'error_type': type(e).__name__,
                 'total_entities': 0
-            })
+            }
+            
+            # Ensure error response is JSON serializable
+            try:
+                import json
+                json.dumps(error_response)
+                return web.json_response(error_response, status=500)
+            except Exception as json_error:
+                logger.error(f"[WEB_UI] Even error response failed JSON serialization: {json_error}")
+                # Last resort - return minimal safe JSON
+                return web.json_response({
+                    'success': False,
+                    'error': 'Critical JSON serialization error',
+                    'cameras': [],
+                    'todo_lists': [],
+                    'total_entities': 0
+                }, status=500)
 
     async def start_server(self, host='0.0.0.0', port=8080):
         """Start the enhanced web server"""

@@ -79,11 +79,48 @@ except ImportError:
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Configuration from environment variables
+# Configuration from environment variables with comprehensive validation
+print("[MAIN] Loading configuration from environment variables...")
+
+# Debug: Show all environment variables for configuration debugging
+config_env_vars = [
+    "PRIMARY_API_KEY", "BACKUP_API_KEYS", "DEVICE_ID", "MQTT_DISCOVERY_PREFIX",
+    "MQTT_HOST", "MQTT_PORT", "MQTT_USER", "MQTT_PASSWORD", "LOG_LEVEL",
+    "DEBUG_MODE", "AUTO_DASHBOARD", "SUPERVISOR_TOKEN", "HOMEASSISTANT_API"
+]
+
+print("[MAIN] Environment variables status:")
+for var in config_env_vars:
+    value = os.getenv(var)
+    if var in ["PRIMARY_API_KEY", "BACKUP_API_KEYS", "MQTT_PASSWORD", "SUPERVISOR_TOKEN"]:
+        print(f"[MAIN]   {var}: {'***SET***' if value else '***NOT SET***'}")
+    else:
+        print(f"[MAIN]   {var}: {value if value else '***NOT SET***'}")
+
+# Configuration loading with validation
 PRIMARY_API_KEY = os.getenv("PRIMARY_API_KEY")
+if PRIMARY_API_KEY:
+    print(f"[MAIN] ✓ Primary API key loaded (length: {len(PRIMARY_API_KEY)})")
+else:
+    print("[MAIN] ⚠️  No primary API key - will use Ollama fallback")
+
 BACKUP_API_KEYS = get_json_env("BACKUP_API_KEYS", "[]")
+if isinstance(BACKUP_API_KEYS, list) and len(BACKUP_API_KEYS) > 0:
+    print(f"[MAIN] ✓ Backup API keys loaded: {len(BACKUP_API_KEYS)} keys")
+else:
+    print("[MAIN] ℹ️  No backup API keys configured")
+
 DEVICE_ID = os.getenv("DEVICE_ID", "aicleaner_v3")
+if DEVICE_ID:
+    print(f"[MAIN] ✓ Device ID: {DEVICE_ID}")
+else:
+    print("[MAIN] ❌ Device ID is empty - this will cause issues")
+
 DISCOVERY_PREFIX = os.getenv("MQTT_DISCOVERY_PREFIX", "homeassistant")
+if DISCOVERY_PREFIX:
+    print(f"[MAIN] ✓ MQTT Discovery Prefix: {DISCOVERY_PREFIX}")
+else:
+    print("[MAIN] ❌ MQTT Discovery Prefix is empty")
 
 # MQTT Configuration - robust handling for when MQTT service unavailable
 MQTT_HOST = get_str_env("MQTT_HOST")
@@ -91,15 +128,49 @@ MQTT_PORT = get_int_env("MQTT_PORT", 1883)
 MQTT_USER = get_str_env("MQTT_USER")
 MQTT_PASSWORD = get_str_env("MQTT_PASSWORD")
 
-# Log MQTT configuration status
+# Log MQTT configuration status with detailed validation
 if MQTT_HOST:
-    logger.info(f"MQTT broker configured: {MQTT_HOST}:{MQTT_PORT}")
+    print(f"[MAIN] ✓ MQTT broker configured: {MQTT_HOST}:{MQTT_PORT}")
+    if MQTT_USER:
+        print(f"[MAIN] ✓ MQTT authentication configured for user: {MQTT_USER}")
+    else:
+        print("[MAIN] ℹ️  MQTT using anonymous connection")
 else:
-    logger.warning("MQTT broker not configured - entity discovery disabled")
+    print("[MAIN] ⚠️  MQTT broker not configured - entity discovery disabled")
 
-# Home Assistant API
+# Home Assistant API validation
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN")
 HOMEASSISTANT_API = os.getenv("HOMEASSISTANT_API", "http://supervisor/core/api")
+
+if SUPERVISOR_TOKEN:
+    print(f"[MAIN] ✓ Home Assistant API access available")
+    print(f"[MAIN]   API endpoint: {HOMEASSISTANT_API}")
+else:
+    print("[MAIN] ❌ SUPERVISOR_TOKEN not available - Home Assistant API access limited")
+
+# Configuration summary
+print("[MAIN] Configuration summary:")
+print(f"[MAIN]   - AI Provider: {'Cloud API' if PRIMARY_API_KEY else 'Local Ollama'}")
+print(f"[MAIN]   - MQTT: {'Enabled' if MQTT_HOST else 'Disabled'}")
+print(f"[MAIN]   - HA API: {'Available' if SUPERVISOR_TOKEN else 'Limited'}")
+print(f"[MAIN]   - Device ID: {DEVICE_ID}")
+print(f"[MAIN]   - Discovery Prefix: {DISCOVERY_PREFIX}")
+
+# Configuration validation warnings
+config_warnings = []
+if not PRIMARY_API_KEY:
+    config_warnings.append("No AI API key - limited to local Ollama")
+if not MQTT_HOST:
+    config_warnings.append("No MQTT broker - entity discovery disabled")
+if not SUPERVISOR_TOKEN:
+    config_warnings.append("No HA API access - limited functionality")
+
+if config_warnings:
+    print("[MAIN] Configuration warnings:")
+    for warning in config_warnings:
+        print(f"[MAIN]   ⚠️  {warning}")
+else:
+    print("[MAIN] ✓ All major configuration components are available")
 
 class EnhancedAICleaner:
     """Enhanced AICleaner application class with web UI"""
