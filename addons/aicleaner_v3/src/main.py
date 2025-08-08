@@ -77,11 +77,6 @@ except ImportError:
     logging.warning("Enhanced web UI not available, falling back to basic functionality")
 
 # Configure logging
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
 # Configuration from environment variables

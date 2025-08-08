@@ -555,7 +555,6 @@ class EnhancedWebUI:
             }
             return web.json_response(status_data)
         except Exception as e:
-            logger.error(f"Error in api_status: {e}")
             # Always return JSON response
             return web.json_response({'error': str(e), 'success': False}, status=500)
     
@@ -670,7 +669,6 @@ class EnhancedWebUI:
             async with session.get('http://supervisor/core/api/states', headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    logger.info(f"Successfully fetched {len(data)} entities from HA API")
                     return data
                 elif response.status == 401:
                     raise Exception("HA API authentication failed - invalid SUPERVISOR_TOKEN")
@@ -691,8 +689,6 @@ class EnhancedWebUI:
     async def api_entities(self, request: web_request.Request):
         """API endpoint to get Home Assistant entities with real HA API calls"""
         try:
-            logger.info("Fetching entities from Home Assistant API...")
-            
             # Get all entities from Home Assistant
             all_entities = await self.get_homeassistant_entities()
             
@@ -716,8 +712,6 @@ class EnhancedWebUI:
                         'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
                         'state': entity.get('state', 'unknown')
                     })
-            
-            logger.info(f"Found {len(cameras)} cameras and {len(todo_lists)} todo lists")
             
             return web.json_response({
                 'cameras': cameras,

@@ -71,12 +71,14 @@ export ANTHROPIC_API_KEY=""
 # --- 3. MQTT CONFIGURATION ---
 # Check for external MQTT broker configuration first
 MQTT_EXTERNAL=$(bashio::config 'mqtt_external_broker')
-bashio::log.debug "External MQTT broker setting: $MQTT_EXTERNAL"
+bashio::log.info "🔍 DEBUG: External MQTT broker setting: '$MQTT_EXTERNAL'"
 
 if [[ "${MQTT_EXTERNAL,,}" == "true" ]]; then
     # External MQTT broker configured
     MQTT_HOST_VALUE=$(bashio::config 'mqtt_host')
-    bashio::log.debug "External MQTT host value: $MQTT_HOST_VALUE"
+    bashio::log.info "🔍 DEBUG: External MQTT host value: '$MQTT_HOST_VALUE'"
+    bashio::log.info "🔍 DEBUG: External MQTT port: '$(bashio::config 'mqtt_port')'"
+    bashio::log.info "🔍 DEBUG: External MQTT username: '$(bashio::config 'mqtt_username')'"
     
     if [[ -n "$MQTT_HOST_VALUE" ]]; then
         export MQTT_HOST="$MQTT_HOST_VALUE"
@@ -95,9 +97,11 @@ elif bashio::services.available "mqtt"; then
     export MQTT_PORT=$(bashio::services mqtt "port")
     export MQTT_USER=$(bashio::services mqtt "username")
     export MQTT_PASSWORD=$(bashio::services mqtt "password")
+    bashio::log.info "🔍 DEBUG: HA internal MQTT service detected - host: $MQTT_HOST, port: $MQTT_PORT"
     bashio::log.info "✓ HA internal MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
     bashio::log.info "✓ Entity discovery and MQTT features will be available"
 else
+    bashio::log.info "🔍 DEBUG: MQTT service check failed - bashio::services.available mqtt returned false"
     bashio::log.warning "⚠️  MQTT service not available - entity discovery disabled"
     bashio::log.warning "To enable full functionality, either:"
     bashio::log.warning "Option 1 - Use HA Internal MQTT:"

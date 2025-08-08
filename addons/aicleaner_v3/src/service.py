@@ -25,7 +25,6 @@ from .monitoring_system import ConfigurableMonitor
 from pathlib import Path
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global instances

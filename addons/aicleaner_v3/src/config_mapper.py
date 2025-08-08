@@ -39,8 +39,6 @@ def load_addon_options() -> Dict[str, Any]:
     defaults = get_default_options()
     
     if not options_file.exists():
-        print("INFO: No options.json found, using default configuration")
-        print("INFO: This is normal for first startup or development environment")
         return defaults
     
     try:
@@ -51,16 +49,11 @@ def load_addon_options() -> Dict[str, Any]:
         merged_options = defaults.copy()
         merged_options.update(loaded_options)
         
-        print(f"INFO: Configuration loaded with {len(loaded_options)} user settings")
         return merged_options
         
     except json.JSONDecodeError as e:
-        print(f"ERROR: Invalid JSON in options.json: {e}")
-        print("INFO: Using default configuration")
         return defaults
     except Exception as e:
-        print(f"ERROR: Failed to load options.json: {e}")
-        print("INFO: Using default configuration")
         return defaults
 
 
@@ -224,28 +217,23 @@ def write_user_config(config: Dict[str, Any], target_path: str = "/app/src/app_c
 """)
             yaml.dump(config, f, default_flow_style=False, indent=2)
             
-        print(f"✓ User configuration written to {target_path}")
+        pass
         
     except Exception as e:
-        print(f"ERROR: Failed to write user config: {e}")
         sys.exit(1)
 
 
 def main():
     """Main configuration mapping function."""
-    print("Mapping Home Assistant addon options to internal configuration...")
     
     # Load addon options
     options = load_addon_options()
-    print(f"Loaded options: {list(options.keys())}")
     
     # Create user configuration
     user_config = create_user_config(options)
     
     # Write user configuration
     write_user_config(user_config)
-    
-    print("Configuration mapping completed successfully!")
 
 
 if __name__ == "__main__":
