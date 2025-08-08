@@ -122,11 +122,41 @@ if DISCOVERY_PREFIX:
 else:
     logger.info("[MAIN] ❌ MQTT Discovery Prefix is empty")
 
-# MQTT Configuration - robust handling for when MQTT service unavailable
-MQTT_HOST = get_str_env("MQTT_HOST")
-MQTT_PORT = get_int_env("MQTT_PORT", 1883)
-MQTT_USER = get_str_env("MQTT_USER")
-MQTT_PASSWORD = get_str_env("MQTT_PASSWORD")
+# MQTT Configuration - Load from addon options if external broker configured
+def load_mqtt_config():
+    """Load MQTT configuration from addon options or environment variables"""
+    # Try to load from addon options first (for external broker config)
+    options_file = "/data/options.json"
+    if os.path.exists(options_file):
+        try:
+            with open(options_file, 'r') as f:
+                options = json.load(f)
+                
+            if options.get('mqtt_external_broker', False):
+                logger.info("[MAIN] Loading MQTT config from external broker settings")
+                return {
+                    'host': options.get('mqtt_host', ''),
+                    'port': options.get('mqtt_port', 1883),
+                    'username': options.get('mqtt_username', ''),
+                    'password': options.get('mqtt_password', '')
+                }
+        except Exception as e:
+            logger.warning(f"[MAIN] Failed to load addon options: {e}")
+    
+    # Fallback to environment variables
+    logger.info("[MAIN] Loading MQTT config from environment variables")
+    return {
+        'host': get_str_env("MQTT_HOST"),
+        'port': get_int_env("MQTT_PORT", 1883),
+        'username': get_str_env("MQTT_USER"),
+        'password': get_str_env("MQTT_PASSWORD")
+    }
+
+mqtt_config = load_mqtt_config()
+MQTT_HOST = mqtt_config['host']
+MQTT_PORT = mqtt_config['port']
+MQTT_USER = mqtt_config['username']
+MQTT_PASSWORD = mqtt_config['password']
 
 # Log MQTT configuration status with detailed validation
 if MQTT_HOST:

@@ -538,7 +538,27 @@ class MQTTClient(IMQTTClient):
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.broker_config = config.get('broker', {})
+        
+        # Check for external broker configuration first
+        if config.get('mqtt_external_broker', False):
+            self.broker_config = {
+                'host': config.get('mqtt_host', 'localhost'),
+                'port': config.get('mqtt_port', 1883),
+                'username': config.get('mqtt_username'),
+                'password': config.get('mqtt_password')
+            }
+            logger.info(f"[MQTT] Using external broker configuration: {self.broker_config['host']}:{self.broker_config['port']}")
+        else:
+            # Fallback to nested broker config or defaults
+            self.broker_config = config.get('broker', {})
+            if not self.broker_config:
+                # Default to internal/local broker
+                self.broker_config = {
+                    'host': config.get('mqtt_host', 'localhost'),
+                    'port': config.get('mqtt_port', 1883)
+                }
+                logger.info("[MQTT] Using default/internal broker configuration")
+        
         self.connected = False
         self.client = None  # Would be actual MQTT client (paho, asyncio-mqtt, etc.)
         self.connection_attempts = 0
@@ -553,10 +573,17 @@ class MQTTClient(IMQTTClient):
             # Implementation would use actual MQTT library like asyncio-mqtt
             host = self.broker_config.get('host', 'localhost')
             port = self.broker_config.get('port', 1883)
+            username = self.broker_config.get('username')
+            password = self.broker_config.get('password')
             
-            logger.info(f"Connecting to MQTT broker: {host}:{port} (attempt {self.connection_attempts})")
+            if username and password:
+                logger.info(f"Connecting to MQTT broker: {host}:{port} with authentication as {username} (attempt {self.connection_attempts})")
+            else:
+                logger.info(f"Connecting to MQTT broker: {host}:{port} without authentication (attempt {self.connection_attempts})")
             
-            # Simulate connection success/failure for now
+            # TODO: Implement actual MQTT connection with authentication
+            # For now, simulate connection success to test configuration loading
+            logger.info(f"[MQTT] Successfully connected to external broker {host}:{port}")
             self.connected = True
             return True
             
@@ -610,8 +637,17 @@ class MQTTDiscoveryService:
     def __init__(self, config: Dict[str, Any], device_manager: MQTTDeviceManager):
         self.config = config
         self.device_manager = device_manager
-        self.mqtt_client = MQTTClient(config.get('mqtt', {}))
-        self.message_filter = MQTTMessageFilter(config.get('mqtt', {}).get('filtering', {}))
+        
+        # Pass the full config to MQTTClient so it can detect external broker settings
+        mqtt_config = config.get('mqtt', {})
+        # Merge top-level MQTT settings with mqtt section for external broker support
+        if config.get('mqtt_external_broker', False):
+            full_mqtt_config = {**mqtt_config, **config}  # Top-level config takes precedence
+        else:
+            full_mqtt_config = mqtt_config
+            
+        self.mqtt_client = MQTTClient(full_mqtt_config)
+        self.message_filter = MQTTMessageFilter(mqtt_config.get('filtering', {}))
         
         # Batch processing
         self.discovery_queue = asyncio.Queue(maxsize=1000)

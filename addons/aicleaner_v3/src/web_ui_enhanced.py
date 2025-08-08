@@ -26,40 +26,23 @@ class EnhancedWebUI:
     
     @web.middleware
     async def json_error_middleware(self, request, handler):
-        """Middleware to ensure API endpoints always return JSON, never HTML errors"""
+        """Simplified middleware to ensure API endpoints return proper JSON responses"""
         try:
             response = await handler(request)
             
-            # For API routes, validate that the response is actually JSON
+            # For API routes, only validate Content-Type - don't manipulate response body
             if request.path.startswith('/api/'):
                 content_type = response.headers.get('Content-Type', '')
                 if not content_type.startswith('application/json'):
                     logger.warning(f"[WEB_UI] API endpoint {request.path} returned non-JSON content-type: {content_type}")
-                    
-                    # Try to read and validate the response body
-                    try:
-                        if hasattr(response, 'text'):
-                            body = await response.text()
-                        else:
-                            body = str(response.body) if response.body else ''
-                        
-                        # Check if body looks like JSON
-                        import json
-                        if body:
-                            json.loads(body)  # Will raise if not valid JSON
-                            logger.info(f"[WEB_UI] Response body is valid JSON despite content-type")
-                        else:
-                            logger.warning(f"[WEB_UI] Empty response body for {request.path}")
-                            
-                    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError) as parse_error:
-                        logger.error(f"[WEB_UI] Invalid JSON response from {request.path}: {parse_error}")
-                        # Return a safe JSON error response
-                        return web.json_response({
-                            'success': False,
-                            'error': 'Invalid JSON response generated',
-                            'path': request.path,
-                            'original_content_type': content_type
-                        }, status=500)
+                    # Return safe JSON error without trying to parse original response
+                    return web.json_response({
+                        'success': False,
+                        'error': 'Invalid response content type',
+                        'path': request.path,
+                        'expected': 'application/json',
+                        'received': content_type
+                    }, status=500)
             
             return response
             
@@ -68,7 +51,7 @@ class EnhancedWebUI:
             if request.path.startswith('/api/'):
                 logger.error(f"[WEB_UI] API endpoint error on {request.path}: {type(e).__name__}: {e}")
                 
-                # Create safe error response with comprehensive error info
+                # Create safe error response
                 error_response = {
                     'success': False,
                     'error': str(e),
@@ -77,19 +60,7 @@ class EnhancedWebUI:
                     'method': request.method
                 }
                 
-                # Ensure error response can be JSON serialized
-                try:
-                    import json
-                    json.dumps(error_response)
-                    return web.json_response(error_response, status=500)
-                except (TypeError, ValueError) as json_error:
-                    logger.error(f"[WEB_UI] Error response serialization failed: {json_error}")
-                    # Ultra-safe fallback
-                    return web.json_response({
-                        'success': False,
-                        'error': 'Serialization error in error handler',
-                        'path': request.path
-                    }, status=500)
+                return web.json_response(error_response, status=500)
             else:
                 # For non-API routes, let the exception bubble up normally
                 raise
