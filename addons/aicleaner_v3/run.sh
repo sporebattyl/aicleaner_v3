@@ -6,6 +6,59 @@
 
 bashio::log.info "Starting AICleaner V3 add-on..."
 
+# ==============================================================================
+# Configuration Helper Functions
+# ==============================================================================
+
+# Resilient configuration reader with jq fallback
+read_config_with_jq() {
+    local key="$1"
+    local default_value="$2"
+    
+    # Try to read with jq, providing fallback for null/missing values
+    local value
+    if [ -f /data/options.json ]; then
+        value=$(jq -r ".$key // empty" /data/options.json 2>/dev/null)
+        if [ -n "$value" ] && [ "$value" != "null" ]; then
+            echo "$value"
+        elif [ -n "$default_value" ]; then
+            echo "$default_value"
+        else
+            echo ""
+        fi
+    else
+        echo "${default_value:-}"
+    fi
+}
+
+# Enhanced configuration reader with bashio primary, jq fallback
+read_config_resilient() {
+    local key="$1"
+    local default_value="$2"
+    
+    # Try bashio first
+    if bashio::config.has_value "$key"; then
+        local bashio_value
+        bashio_value=$(bashio::config "$key")
+        if [ -n "$bashio_value" ] && [ "$bashio_value" != "null" ]; then
+            echo "$bashio_value"
+            return 0
+        fi
+    fi
+    
+    # Fall back to jq
+    local jq_value
+    jq_value=$(read_config_with_jq "$key" "$default_value")
+    if [ -n "$jq_value" ]; then
+        bashio::log.debug "Using jq fallback for config key: $key"
+        echo "$jq_value"
+        return 0
+    fi
+    
+    # Return default if nothing found
+    echo "${default_value:-}"
+}
+
 # --- 0. ENVIRONMENT CHECK ---
 bashio::log.info "Checking addon environment..."
 
@@ -69,14 +122,14 @@ fi
 # Test individual configuration reads with detailed error reporting
 bashio::log.info "Testing configuration value parsing..."
 
-# Primary API key validation
-if bashio::config.has_value 'primary_api_key'; then
-    API_KEY_LENGTH=$(bashio::config 'primary_api_key' | wc -c)
+# Primary API key validation with resilient config reading
+PRIMARY_KEY=$(read_config_resilient 'primary_api_key' '')
+if [ -n "$PRIMARY_KEY" ] && [ "$PRIMARY_KEY" != "null" ]; then
+    API_KEY_LENGTH=${#PRIMARY_KEY}
     if [ "$API_KEY_LENGTH" -gt 1 ]; then
         bashio::log.info "✓ Primary API key found (length: ${API_KEY_LENGTH} chars)"
         
         # Basic API key format validation for Gemini keys
-        PRIMARY_KEY=$(bashio::config 'primary_api_key')
         if [[ "$PRIMARY_KEY" == AIzaSy* ]]; then
             bashio::log.info "  ✓ API key format appears to be valid Gemini key"
         else
@@ -89,9 +142,35 @@ else
     bashio::log.warning "No primary API key provided. Will use local Ollama as fallback."
 fi
 
-# Backup API keys validation
-if bashio::config.has_value 'backup_api_keys'; then
-    BACKUP_KEYS_RAW=$(bashio::config 'backup_api_keys')
+# Configuration Sanitization: Fix common schema validation issues
+bashio::log.info "Performing configuration sanitization..."
+
+# Check for backup_api_keys issue that breaks bashio schema validation
+BACKUP_KEYS_RAW_JQ=$(read_config_with_jq 'backup_api_keys' '')
+if [ -n "$BACKUP_KEYS_RAW_JQ" ]; then
+    bashio::log.debug "Raw backup_api_keys from jq: '$BACKUP_KEYS_RAW_JQ'"
+    
+    # Check if backup_api_keys is set to literal string "str" (common config error)
+    if [ "$BACKUP_KEYS_RAW_JQ" = "str" ]; then
+        bashio::log.warning "⚠️  Detected backup_api_keys='str' - this breaks bashio schema validation"
+        bashio::log.info "🔧 Auto-fixing: Converting 'str' to empty array []"
+        
+        # Create a temporary fixed configuration
+        TEMP_CONFIG="/tmp/options_fixed.json"
+        jq '.backup_api_keys = []' /data/options.json > "$TEMP_CONFIG" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            cp "$TEMP_CONFIG" /data/options.json
+            bashio::log.info "✓ Configuration sanitized - backup_api_keys fixed to empty array"
+        else
+            bashio::log.warning "Could not auto-fix configuration, continuing with fallback parsing"
+        fi
+        rm -f "$TEMP_CONFIG"
+    fi
+fi
+
+# Backup API keys validation with resilient reading
+BACKUP_KEYS_RAW=$(read_config_resilient 'backup_api_keys' '[]')
+if [ -n "$BACKUP_KEYS_RAW" ] && [ "$BACKUP_KEYS_RAW" != "[]" ]; then
     bashio::log.info "✓ Backup API keys configuration found"
     bashio::log.debug "  Raw backup_api_keys value: '$BACKUP_KEYS_RAW'"
     
@@ -100,18 +179,16 @@ if bashio::config.has_value 'backup_api_keys'; then
         BACKUP_COUNT=$(echo "$BACKUP_KEYS_RAW" | jq '. | length' 2>/dev/null || echo "0")
         bashio::log.info "  ✓ Valid JSON array with $BACKUP_COUNT entries"
     else
-        bashio::log.error "  ❌ backup_api_keys is not valid JSON array format!"
-        bashio::log.error "  Expected: [] (empty array) or [\"key1\", \"key2\"] (array of keys)"
-        bashio::log.error "  Got: '$BACKUP_KEYS_RAW'"
-        bashio::log.error "  Please fix this in Home Assistant addon configuration UI"
+        bashio::log.warning "  ⚠️  backup_api_keys format unusual, using fallback parsing"
+        bashio::log.debug "  Got: '$BACKUP_KEYS_RAW'"
     fi
 else
     bashio::log.info "No backup API keys configured (optional)"
 fi
 
-# Validate device ID format
-DEVICE_ID=$(bashio::config 'device_id')
-bashio::log.info "🔍 DEBUG: Raw device_id from bashio: '$DEVICE_ID'"
+# Validate device ID format with resilient reading
+DEVICE_ID=$(read_config_resilient 'device_id' 'aicleaner_v3')
+bashio::log.info "🔍 DEBUG: Device ID from resilient config: '$DEVICE_ID'"
 
 # Handle null/empty device_id
 if [[ "$DEVICE_ID" == "null" || -z "$DEVICE_ID" || "$DEVICE_ID" == "" ]]; then
@@ -150,28 +227,30 @@ safe_config_export() {
     fi
 }
 
-# Export configuration with error handling
-safe_config_export "log_level" "info" "LOG_LEVEL"
-safe_config_export "primary_api_key" "" "PRIMARY_API_KEY"
-safe_config_export "mqtt_discovery_prefix" "homeassistant" "MQTT_DISCOVERY_PREFIX"
-safe_config_export "debug_mode" "false" "DEBUG_MODE"
-safe_config_export "auto_dashboard" "true" "AUTO_DASHBOARD"
+# Export configuration with error handling using resilient config reading
+export LOG_LEVEL=$(read_config_resilient "log_level" "info")
+export PRIMARY_API_KEY="$PRIMARY_KEY"  # Use the key we already read with resilient method
+export MQTT_DISCOVERY_PREFIX=$(read_config_resilient "mqtt_discovery_prefix" "homeassistant")
+export DEBUG_MODE=$(read_config_resilient "debug_mode" "false")
+export AUTO_DASHBOARD=$(read_config_resilient "auto_dashboard" "true")
 
-# Handle backup API keys specially (JSON array)
-if bashio::config.has_value 'backup_api_keys'; then
-    BACKUP_KEYS_RAW=$(bashio::config 'backup_api_keys')
-    # Validate JSON before processing
-    if echo "$BACKUP_KEYS_RAW" | jq . >/dev/null 2>&1; then
-        export BACKUP_API_KEYS=$(echo "$BACKUP_KEYS_RAW" | jq -c '.')
-        bashio::log.info "  ✓ BACKUP_API_KEYS exported as valid JSON"
-    else
-        export BACKUP_API_KEYS="[]"
-        bashio::log.error "  ❌ backup_api_keys contains invalid JSON, using empty array"
-        bashio::log.error "  Please fix backup_api_keys in Home Assistant UI (should be [] or list of strings)"
-    fi
+bashio::log.info "Configuration exported with resilient reading:"
+bashio::log.info "  ✓ LOG_LEVEL: $LOG_LEVEL"
+bashio::log.info "  ✓ PRIMARY_API_KEY: ${PRIMARY_API_KEY:+***SET***}"
+bashio::log.info "  ✓ MQTT_DISCOVERY_PREFIX: $MQTT_DISCOVERY_PREFIX" 
+bashio::log.info "  ✓ DEBUG_MODE: $DEBUG_MODE"
+bashio::log.info "  ✓ AUTO_DASHBOARD: $AUTO_DASHBOARD"
+
+# Handle backup API keys specially (JSON array) with resilient reading
+BACKUP_KEYS_EXPORT=$(read_config_resilient 'backup_api_keys' '[]')
+# Validate JSON before processing
+if echo "$BACKUP_KEYS_EXPORT" | jq . >/dev/null 2>&1; then
+    export BACKUP_API_KEYS=$(echo "$BACKUP_KEYS_EXPORT" | jq -c '.')
+    BACKUP_COUNT=$(echo "$BACKUP_KEYS_EXPORT" | jq '. | length' 2>/dev/null || echo "0")
+    bashio::log.info "  ✓ BACKUP_API_KEYS exported as valid JSON ($BACKUP_COUNT keys)"
 else
     export BACKUP_API_KEYS="[]"
-    bashio::log.info "  ✓ BACKUP_API_KEYS set to empty array (default)"
+    bashio::log.warning "  ⚠️  backup_api_keys invalid JSON format, using empty array"
 fi
 
 # Device ID was already validated above
@@ -190,11 +269,12 @@ bashio::log.info "Validating exported environment variables..."
 [ -n "$MQTT_DISCOVERY_PREFIX" ] && bashio::log.info "  ✓ MQTT_DISCOVERY_PREFIX: $MQTT_DISCOVERY_PREFIX" || bashio::log.error "  ❌ MQTT_DISCOVERY_PREFIX is empty"
 
 # --- 3. MQTT CONFIGURATION ---
-# Check for external MQTT broker configuration first
+# Resilient MQTT broker configuration with bashio/jq fallback
 bashio::log.info "Validating MQTT configuration..."
 
-if bashio::config.has_value 'mqtt_external_broker'; then
-    MQTT_EXTERNAL_RAW=$(bashio::config 'mqtt_external_broker')
+# Try resilient configuration reading for mqtt_external_broker
+MQTT_EXTERNAL_RAW=$(read_config_resilient 'mqtt_external_broker' 'false')
+if [ -n "$MQTT_EXTERNAL_RAW" ] && [ "$MQTT_EXTERNAL_RAW" != "false" ]; then
     bashio::log.info "✓ MQTT external broker setting found: '$MQTT_EXTERNAL_RAW'"
     
     # Normalize boolean value - handle various boolean representations
@@ -226,7 +306,7 @@ if bashio::config.has_value 'mqtt_external_broker'; then
             ;;
     esac
 else
-    bashio::log.warning "⚠️  mqtt_external_broker setting not found in configuration"
+    bashio::log.info "ℹ️  mqtt_external_broker not configured or set to false, using internal MQTT"
     MQTT_EXTERNAL="false"  # Default fallback
 fi
 
@@ -236,32 +316,38 @@ bashio::log.info "🔍 DEBUG: External MQTT broker setting (normalized): '$MQTT_
 if [[ "$MQTT_EXTERNAL" == "true" ]]; then
     bashio::log.info "External MQTT broker enabled - validating configuration..."
     
-    # Pre-validate required external MQTT settings
-    if ! bashio::config.has_value 'mqtt_host'; then
+    # Pre-validate required external MQTT settings using resilient config reading
+    MQTT_HOST_CHECK=$(read_config_resilient 'mqtt_host' '')
+    if [ -z "$MQTT_HOST_CHECK" ]; then
         bashio::log.error "❌ External MQTT enabled but mqtt_host not configured!"
         bashio::log.error "Please set mqtt_host in addon configuration"
         bashio::exit.nok "Missing mqtt_host for external MQTT broker"
     fi
     
-    if ! bashio::config.has_value 'mqtt_port'; then
-        bashio::log.warning "⚠️  mqtt_port not set, will use default (1883)"
+    MQTT_PORT_CHECK=$(read_config_resilient 'mqtt_port' '1883')
+    if [ "$MQTT_PORT_CHECK" = "1883" ]; then
+        bashio::log.info "ℹ️  mqtt_port using default (1883)"
     fi
     
     bashio::log.info "✓ External MQTT broker configuration validation passed"
 fi
 
 if [[ "$MQTT_EXTERNAL" == "true" ]]; then
-    # External MQTT broker configured
-    MQTT_HOST_VALUE=$(bashio::config 'mqtt_host')
+    # External MQTT broker configured - use resilient config reading
+    MQTT_HOST_VALUE=$(read_config_resilient 'mqtt_host' '')
+    MQTT_PORT_VALUE=$(read_config_resilient 'mqtt_port' '1883')
+    MQTT_USERNAME_VALUE=$(read_config_resilient 'mqtt_username' '')
+    MQTT_PASSWORD_VALUE=$(read_config_resilient 'mqtt_password' '')
+    
     bashio::log.info "🔍 DEBUG: External MQTT host value: '$MQTT_HOST_VALUE'"
-    bashio::log.info "🔍 DEBUG: External MQTT port: '$(bashio::config 'mqtt_port')'"
-    bashio::log.info "🔍 DEBUG: External MQTT username: '$(bashio::config 'mqtt_username')'"
+    bashio::log.info "🔍 DEBUG: External MQTT port: '$MQTT_PORT_VALUE'"
+    bashio::log.info "🔍 DEBUG: External MQTT username: '$MQTT_USERNAME_VALUE'"
     
     if [[ -n "$MQTT_HOST_VALUE" ]]; then
         export MQTT_HOST="$MQTT_HOST_VALUE"
-        export MQTT_PORT=$(bashio::config 'mqtt_port')
-        export MQTT_USER=$(bashio::config 'mqtt_username')
-        export MQTT_PASSWORD=$(bashio::config 'mqtt_password')
+        export MQTT_PORT="$MQTT_PORT_VALUE"
+        export MQTT_USER="$MQTT_USERNAME_VALUE"
+        export MQTT_PASSWORD="$MQTT_PASSWORD_VALUE"
         bashio::log.info "✓ External MQTT broker configured: ${MQTT_HOST}:${MQTT_PORT}"
         bashio::log.info "✓ Using external MQTT broker for entity discovery"
     else
