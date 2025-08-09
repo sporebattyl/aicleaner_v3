@@ -463,12 +463,8 @@ class EnhancedAICleaner:
         logger.info(f"Received signal {signum}, shutting down...")
         self.running = False
         self.status = "stopping"
-        if self.mqtt_client:
-            self.publish_state()
-            self.mqtt_client.disconnect()
-        # Cleanup web UI resources
-        if self.web_ui:
-            asyncio.create_task(self.web_ui.shutdown())
+        # Note: Async cleanup will be handled in main loop finally block
+        # Cannot create async tasks from sync signal handler
     
     async def start_web_ui(self):
         """Start the enhanced web UI server"""
@@ -500,52 +496,70 @@ class EnhancedAICleaner:
         
         logger.info("🚀 Enhanced AICleaner V3 started successfully")
         
-        # Main loop
-        while self.running:
-            try:
-                # Publish periodic state updates
-                if self.mqtt_client:
-                    self.publish_state()
-                
-                # Check configuration status
-                options = self.load_addon_options()
-                has_camera = bool(options.get('default_camera', '').strip())
-                has_todo = bool(options.get('default_todo_list', '').strip())
-                
-                if has_camera and has_todo:
-                    # Perform AI cleaning tasks (placeholder for now)
-                    if self.enabled and self.status not in ["error", "stopping"]:
-                        logger.debug(f"✅ Active monitoring: camera={options['default_camera']}, todo={options['default_todo_list']}")
-                        await asyncio.sleep(30)  # Process every 30 seconds
-                    else:
-                        logger.debug("⏸️  Addon disabled - monitoring paused")
-                        await asyncio.sleep(5)   # Check more frequently when disabled
-                else:
-                    # Provide helpful configuration guidance
-                    missing = []
-                    if not has_camera:
-                        missing.append("camera entity")
-                    if not has_todo:
-                        missing.append("todo list entity")
-                    
-                    logger.info(f"⚙️  Configuration needed: missing {' and '.join(missing)}")
-                    logger.info("🌐 Please visit the web interface to configure entities")
-                    
+        # Main loop with proper exception handling
+        try:
+            while self.running:
+                try:
+                    # Publish periodic state updates
                     if self.mqtt_client:
-                        logger.debug("📡 MQTT available - entities will auto-register once configured")
+                        self.publish_state()
+                    
+                    # Check configuration status
+                    options = self.load_addon_options()
+                    has_camera = bool(options.get('default_camera', '').strip())
+                    has_todo = bool(options.get('default_todo_list', '').strip())
+                    
+                    if has_camera and has_todo:
+                        # Perform AI cleaning tasks (placeholder for now)
+                        if self.enabled and self.status not in ["error", "stopping"]:
+                            logger.debug(f"✅ Active monitoring: camera={options['default_camera']}, todo={options['default_todo_list']}")
+                            await asyncio.sleep(30)  # Process every 30 seconds
+                        else:
+                            logger.debug("⏸️  Addon disabled - monitoring paused")
+                            await asyncio.sleep(5)   # Check more frequently when disabled
                     else:
-                        logger.debug("🔌 MQTT unavailable - manual entity configuration required")
-                    
-                    await asyncio.sleep(15)  # Check configuration less frequently
-                    
-            except Exception as e:
-                logger.error(f"Error in main loop: {e}")
-                self.status = "error"
-                await asyncio.sleep(10)
-        
-        # Cleanup resources before stopping
-        if self.web_ui:
-            await self.web_ui.shutdown()
+                        # Provide helpful configuration guidance
+                        missing = []
+                        if not has_camera:
+                            missing.append("camera entity")
+                        if not has_todo:
+                            missing.append("todo list entity")
+                        
+                        logger.info(f"⚙️  Configuration needed: missing {' and '.join(missing)}")
+                        logger.info("🌐 Please visit the web interface to configure entities")
+                        
+                        if self.mqtt_client:
+                            logger.debug("📡 MQTT available - entities will auto-register once configured")
+                        else:
+                            logger.debug("🔌 MQTT unavailable - manual entity configuration required")
+                        
+                        await asyncio.sleep(15)  # Check configuration less frequently
+                        
+                except Exception as e:
+                    logger.error(f"Error in main loop: {e}")
+                    self.status = "error"
+                    await asyncio.sleep(10)
+        finally:
+            # Cleanup resources before stopping (guaranteed to run)
+            logger.info("Cleaning up resources...")
+            
+            # Cleanup web UI
+            if self.web_ui:
+                try:
+                    await self.web_ui.shutdown()
+                    logger.info("✓ Web UI shutdown complete")
+                except Exception as e:
+                    logger.error(f"Error shutting down web UI: {e}")
+            
+            # Cleanup MQTT
+            if self.mqtt_client:
+                try:
+                    self.publish_state()  # Final state update
+                    self.mqtt_client.loop_stop()
+                    self.mqtt_client.disconnect()
+                    logger.info("✓ MQTT cleanup complete")
+                except Exception as e:
+                    logger.error(f"Error shutting down MQTT: {e}")
         
         logger.info("Enhanced AICleaner V3 stopped")
         return True
