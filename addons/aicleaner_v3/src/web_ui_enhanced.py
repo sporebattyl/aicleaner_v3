@@ -26,41 +26,53 @@ class EnhancedWebUI:
     
     @web.middleware
     async def json_error_middleware(self, request, handler):
-        """Simplified middleware to ensure API endpoints return proper JSON responses"""
+        """Enhanced middleware to ensure clean JSON responses and prevent stdout contamination"""
         try:
-            response = await handler(request)
+            # Temporarily redirect stdout to prevent contamination of JSON responses
+            import sys
+            import io
+            original_stdout = sys.stdout
             
-            # For API routes, only validate Content-Type - don't manipulate response body
-            if request.path.startswith('/api/'):
-                content_type = response.headers.get('Content-Type', '')
-                if not content_type.startswith('application/json'):
-                    logger.warning(f"[WEB_UI] API endpoint {request.path} returned non-JSON content-type: {content_type}")
-                    # Return safe JSON error without trying to parse original response
-                    return web.json_response({
-                        'success': False,
-                        'error': 'Invalid response content type',
-                        'path': request.path,
-                        'expected': 'application/json',
-                        'received': content_type
-                    }, status=500)
-            
-            return response
+            try:
+                # For API routes, capture any stray stdout output
+                if request.path.startswith('/api/'):
+                    sys.stdout = io.StringIO()
+                
+                response = await handler(request)
+                
+                # For API routes, ensure proper JSON headers
+                if request.path.startswith('/api/'):
+                    if not response.headers.get('Content-Type'):
+                        response.headers['Content-Type'] = 'application/json'
+                    response.headers['Cache-Control'] = 'no-cache'
+                    response.headers['X-Content-Type-Options'] = 'nosniff'
+                
+                return response
+                
+            finally:
+                # Always restore stdout
+                sys.stdout = original_stdout
             
         except Exception as e:
+            # Ensure stdout is restored even on exception
+            import sys
+            if hasattr(sys.stdout, 'getvalue'):
+                sys.stdout = original_stdout
+                
             # Only apply JSON error handling to API routes
             if request.path.startswith('/api/'):
-                logger.error(f"[WEB_UI] API endpoint error on {request.path}: {type(e).__name__}: {e}")
-                
-                # Create safe error response
-                error_response = {
+                # Create safe error response with clean headers
+                error_response = web.json_response({
                     'success': False,
                     'error': str(e),
                     'error_type': type(e).__name__,
                     'path': request.path,
                     'method': request.method
-                }
+                }, status=500)
                 
-                return web.json_response(error_response, status=500)
+                error_response.headers['Content-Type'] = 'application/json'
+                error_response.headers['Cache-Control'] = 'no-cache'
+                return error_response
             else:
                 # For non-API routes, let the exception bubble up normally
                 raise
@@ -563,8 +575,9 @@ class EnhancedWebUI:
         return web.Response(text=html_content, content_type='text/html')
     
     async def api_status(self, request: web_request.Request):
-        """Enhanced API endpoint for status information"""
+        """Enhanced API endpoint for status information with clean JSON response"""
         try:
+            # Create response data
             status_data = {
                 'status': getattr(self.app, 'status', 'unknown'),
                 'enabled': getattr(self.app, 'enabled', True),
@@ -575,10 +588,18 @@ class EnhancedWebUI:
                 'version': 'enhanced-1.0.0',
                 'supervisor_token_available': bool(os.getenv('SUPERVISOR_TOKEN'))
             }
-            return web.json_response(status_data)
+            
+            # Create clean JSON response with explicit headers
+            response = web.json_response(status_data)
+            response.headers['Content-Type'] = 'application/json'
+            response.headers['Cache-Control'] = 'no-cache'
+            return response
+            
         except Exception as e:
-            # Always return JSON response
-            return web.json_response({'error': str(e), 'success': False}, status=500)
+            # Always return clean JSON response for errors
+            error_response = web.json_response({'error': str(e), 'success': False}, status=500)
+            error_response.headers['Content-Type'] = 'application/json'
+            return error_response
     
     async def api_test_generation(self, request: web_request.Request):
         """API endpoint to test AI generation with enhanced HA API testing"""
