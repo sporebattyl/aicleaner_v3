@@ -77,7 +77,14 @@ except ImportError:
     HAS_ENHANCED_UI = False
     logging.warning("Enhanced web UI not available, falling back to basic functionality")
 
-# Configure logging
+# Configure logging to ensure it goes to stderr, not stdout (prevents JSON API contamination)
+import sys
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr,  # Force all logging to stderr to prevent stdout contamination
+    force=True
+)
 logger = logging.getLogger(__name__)
 
 # Configuration from environment variables with comprehensive validation

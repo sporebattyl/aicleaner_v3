@@ -5,6 +5,7 @@ Validates quota management, error recovery, and intelligent model selection
 """
 
 import os
+import sys
 import time
 from unittest.mock import patch, MagicMock
 from quota_manager import QuotaManager, ApiKeyStatus, ModelType
@@ -289,53 +290,53 @@ class TestIntegrationScenarios:
 def run_tests():
     """Run all tests manually without pytest"""
     
-    print("🧪 Running Enhanced Gemini Agent Tests...\n")
+    print("🧪 Running Enhanced Gemini Agent Tests...\n", file=sys.stderr)
     
     # Test QuotaManager
-    print("📊 Testing QuotaManager...")
+    print("📊 Testing QuotaManager...", file=sys.stderr)
     try:
         with patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key_1"}):
             manager = QuotaManager()
-            print("✓ QuotaManager initialization")
+            print("✓ QuotaManager initialization", file=sys.stderr)
             
             model = manager.select_model("high", 100)
             assert model == ModelType.PRO
-            print("✓ Model selection logic")
+            print("✓ Model selection logic", file=sys.stderr)
             
             status = manager.get_quota_status()
             assert status["available_keys"] == 1
-            print("✓ Quota status reporting")
+            print("✓ Quota status reporting", file=sys.stderr)
             
     except Exception as e:
-        print(f"✗ QuotaManager test failed: {e}")
+        print(f"✗ QuotaManager test failed: {e}", file=sys.stderr)
     
     # Test EnhancedGeminiWrapper
-    print("\n🤖 Testing EnhancedGeminiWrapper...")
+    print("\n🤖 Testing EnhancedGeminiWrapper...", file=sys.stderr)
     try:
         with patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key_1"}):
             wrapper = EnhancedGeminiWrapper()
-            print("✓ Wrapper initialization")
+            print("✓ Wrapper initialization", file=sys.stderr)
             
             # Test Claude-only response
             response = wrapper._claude_only_response("Test", "Test reason")
             assert response["success"] is True
-            print("✓ Claude-only response generation")
+            print("✓ Claude-only response generation", file=sys.stderr)
             
             # Test fallback activation
             wrapper.quota_manager.api_keys[0].requests_today = 250
             response = wrapper.chat_with_gemini("Test prompt")
             assert wrapper.fallback_mode is True
-            print("✓ Fallback mode activation")
+            print("✓ Fallback mode activation", file=sys.stderr)
             
             # Test status reporting
             status = wrapper.get_status()
             assert "fallback_mode" in status
-            print("✓ Status reporting")
+            print("✓ Status reporting", file=sys.stderr)
             
     except Exception as e:
-        print(f"✗ EnhancedGeminiWrapper test failed: {e}")
+        print(f"✗ EnhancedGeminiWrapper test failed: {e}", file=sys.stderr)
     
-    print("\n✅ All tests completed!")
+    print("\n✅ All tests completed!", file=sys.stderr)
 
 
 if __name__ == "__main__":

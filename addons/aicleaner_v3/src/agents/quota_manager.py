@@ -6,6 +6,7 @@ Handles intelligent API key cycling and quota optimization for Claude-Gemini col
 
 import time
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from enum import Enum
@@ -239,19 +240,19 @@ if __name__ == "__main__":
     # Initialize quota manager
     try:
         manager = QuotaManager()
-        print("✓ Quota Manager initialized successfully")
+        print("✓ Quota Manager initialized successfully", file=sys.stderr)
         
         # Show initial status
         status = manager.get_quota_status()
-        print(f"Total quota: {status['total_daily_remaining']}/1000 daily, {status['available_keys']}/{status['total_keys']} keys available")
+        print(f"Total quota: {status['total_daily_remaining']}/1000 daily, {status['available_keys']}/{status['total_keys']} keys available", file=sys.stderr)
         
         # Test request coordination
         result = manager.make_request("analysis", "high")
         if result["success"]:
-            print(f"✓ Request coordinated: Key {result['key_id']}, Model {result['model']}")
+            print(f"✓ Request coordinated: Key {result['key_id']}, Model {result['model']}", file=sys.stderr)
         else:
-            print(f"✗ Request failed: {result['error']}")
+            print(f"✗ Request failed: {result['error']}", file=sys.stderr)
             
     except ValueError as e:
-        print(f"✗ Initialization failed: {e}")
-        print("Make sure GEMINI_API_KEY_1 through GEMINI_API_KEY_4 are set in environment")
+        print(f"✗ Initialization failed: {e}", file=sys.stderr)
+        print("Make sure GEMINI_API_KEY_1 through GEMINI_API_KEY_4 are set in environment", file=sys.stderr)

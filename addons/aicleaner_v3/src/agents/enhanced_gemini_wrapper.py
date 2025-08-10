@@ -6,6 +6,7 @@ Provides error recovery and fallback mechanisms for Claude-Gemini collaboration
 
 import json
 import subprocess
+import sys
 import time
 from typing import Dict, Any, Optional, List
 from quota_manager import QuotaManager, ModelType
@@ -253,7 +254,7 @@ While I cannot consult with Gemini at this moment, I can provide comprehensive a
         }
         
         # In practice, this would be logged to a proper logging system
-        print(f"ERROR: {json.dumps(error_record, indent=2)}")
+        print(f"ERROR: {json.dumps(error_record, indent=2)}", file=sys.stderr)
     
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive status of the collaboration system"""
@@ -292,7 +293,7 @@ While I cannot consult with Gemini at this moment, I can provide comprehensive a
     def reset_fallback_mode(self):
         """Reset fallback mode (useful when quota refreshes)"""
         self.fallback_mode = False
-        print("✓ Fallback mode reset - Gemini collaboration re-enabled")
+        print("✓ Fallback mode reset - Gemini collaboration re-enabled", file=sys.stderr)
 
 
 # Example usage and testing
@@ -300,7 +301,7 @@ if __name__ == "__main__":
     try:
         # Initialize enhanced wrapper
         wrapper = EnhancedGeminiWrapper()
-        print("✓ Enhanced Gemini Wrapper initialized")
+        print("✓ Enhanced Gemini Wrapper initialized", file=sys.stderr)
         
         # Test basic chat
         response = wrapper.chat_with_gemini(
@@ -309,14 +310,14 @@ if __name__ == "__main__":
         )
         
         if response["success"]:
-            print(f"✓ Chat successful using {response['source']}")
-            print(f"Response length: {len(response['response'])} characters")
+            print(f"✓ Chat successful using {response['source']}", file=sys.stderr)
+            print(f"Response length: {len(response['response'])} characters", file=sys.stderr)
         else:
-            print(f"✗ Chat failed: {response.get('error', 'Unknown error')}")
+            print(f"✗ Chat failed: {response.get('error', 'Unknown error')}", file=sys.stderr)
         
         # Show status
         status = wrapper.get_status()
-        print(f"Status: Fallback mode: {status['fallback_mode']}, Available keys: {status['quota_status']['available_keys']}")
+        print(f"Status: Fallback mode: {status['fallback_mode']}, Available keys: {status['quota_status']['available_keys']}", file=sys.stderr)
         
     except Exception as e:
-        print(f"✗ Initialization failed: {e}")
+        print(f"✗ Initialization failed: {e}", file=sys.stderr)
