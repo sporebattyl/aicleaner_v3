@@ -1,6 +1,7 @@
-name: "AICleaner V3 Repository"
+name: "AI Cleaner - Smart Home Cleaning Assistant"
 url: "https://github.com/sporebattyl/aicleaner_v3"
 maintainer: "sporebattyl"
+description: "AI-powered cleaning task management with intelligent zone monitoring and automatic Home Assistant integration. Supports multiple AI providers (Gemini, Ollama) with privacy-first design."
 addons:
-  aicleaner_v3:
-    location: addons/aicleaner_v3
+  ai_cleaner:
+    location: ai_cleaner

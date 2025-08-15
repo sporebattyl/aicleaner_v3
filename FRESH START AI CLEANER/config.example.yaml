@@ -1,0 +1,132 @@
+# AICleaner V3 Configuration Example
+# Enhanced with 4-level privacy spectrum and visual annotations
+
+_metadata:
+  generated_by: AICleaner V3 Configuration Manager
+  version: 3.0.0
+  description: Example configuration showing all available options
+
+# System-wide settings
+system:
+  log_level: info                    # debug, info, warning, error
+  debug_mode: false                  # Enable debug features
+  auto_dashboard: true               # Auto-configure Home Assistant dashboard
+  max_concurrent_requests: 3         # Max concurrent analysis requests
+  request_timeout: 300               # Max request processing time (seconds)
+  health_check_interval: 60          # Health check interval (seconds)
+  performance_history_size: 100      # Performance entries to keep
+
+# Privacy engine configuration (4-level spectrum)
+privacy:
+  default_level: 2                   # 1=Raw, 2=Sanitized, 3=Metadata, 4=Local
+  allow_level_override: true         # Allow per-request privacy override
+  
+  # Sanitization settings (Level 2)
+  face_blur_strength: 99             # Face blur intensity (odd numbers)
+  text_blur_strength: 15             # Text blur intensity (odd numbers)
+  min_face_size: 30                  # Minimum face detection size
+
+# Visual annotation settings
+annotation:
+  enable_annotations: true           # Enable bounding box annotations
+  max_text_length: 50               # Max annotation text length
+  min_box_size: 20                  # Minimum bounding box size
+  font_size: 14                     # Annotation font size
+  
+  # Colors (RGB values 0-255)
+  box_color: [255, 0, 0]            # Red bounding boxes
+  text_color: [255, 255, 255]       # White text
+  background_color: [255, 0, 0]     # Red text background
+  
+  # Behavior
+  number_tasks: true                 # Number tasks in annotations
+  show_confidence: true              # Show confidence scores
+  alpha: 0.8                        # Annotation transparency
+
+# Home Assistant integration
+homeassistant:
+  device_id: aicleaner_v3           # Device ID for MQTT discovery
+  discovery_prefix: homeassistant   # MQTT discovery prefix
+  
+  # Entity configuration (optional)
+  default_camera: camera.living_room        # Default camera entity
+  default_todo_list: todo.cleaning_tasks    # Default todo list entity
+  
+  # MQTT settings
+  mqtt_use_external: false          # Use external MQTT broker
+  mqtt_host: null                   # External MQTT host (if enabled)
+  mqtt_port: 1883                   # MQTT port
+  mqtt_username: null               # MQTT username (if required)
+  mqtt_password: null               # MQTT password (if required)
+
+# LLM Provider configurations
+providers:
+  # Gemini provider (cloud-based)
+  gemini:
+    name: gemini
+    api_key: "your-gemini-api-key-here"      # Required for cloud processing
+    model: gemini-pro-vision                 # gemini-pro-vision, gemini-1.5-pro
+    max_retries: 3                           # Retry attempts
+    timeout: 30                              # Request timeout (seconds)
+    
+    # Generation parameters
+    temperature: 0.1                         # Creativity level (0.0-1.0)
+    max_tokens: 2048                         # Maximum response tokens
+    top_p: 0.8                              # Nucleus sampling
+    top_k: 40                               # Top-k sampling
+  
+  # Backup Gemini provider (optional)
+  gemini_backup:
+    name: gemini_backup
+    api_key: "your-backup-api-key-here"      # Backup API key
+    model: gemini-pro-vision
+    max_retries: 2
+    timeout: 30
+    temperature: 0.1
+    max_tokens: 2048
+  
+  # Ollama provider (local/external)
+  ollama:
+    name: ollama
+    host: localhost                          # Ollama server host
+    port: 11434                             # Ollama server port
+    vision_model: llava:13b                 # Vision model for image analysis
+    text_model: mistral:7b                  # Text model for metadata analysis
+    timeout: 120                            # Longer timeout for local processing
+    max_retries: 2                          # Fewer retries for local
+    
+    # Resource limits
+    max_cpu_percent: 80.0                   # Max CPU usage threshold
+    max_memory_gb: 8.0                      # Max memory usage threshold
+    
+    # Generation parameters
+    temperature: 0.1
+    max_tokens: 1024
+    top_p: 0.9
+
+# Provider selection strategy
+primary_provider: gemini              # Primary provider name
+fallback_providers:                   # Fallback chain
+  - gemini_backup
+  - ollama
+
+# Privacy Level Descriptions:
+# Level 1 (Raw): Fastest processing, no privacy protection
+#   - Raw images sent directly to cloud provider
+#   - Best accuracy and speed
+#   - Use when privacy is not a concern
+#
+# Level 2 (Sanitized): Recommended balance
+#   - Faces and sensitive data blurred before cloud processing
+#   - Maintains spatial context and object details
+#   - Good accuracy with meaningful privacy protection
+#
+# Level 3 (Metadata): High privacy, limited accuracy
+#   - Only scene metadata sent to cloud
+#   - Fast processing but may miss specific details
+#   - Good for basic cleaning task detection
+#
+# Level 4 (Local): Maximum privacy, slower processing
+#   - Everything processed on external Ollama instance
+#   - Complete data sovereignty
+#   - Requires user-managed Ollama server

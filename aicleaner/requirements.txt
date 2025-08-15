@@ -1,0 +1,43 @@
+# Core dependencies for AICleaner V3
+pydantic>=2.0.0,<3.0.0
+aiohttp>=3.8.0,<4.0.0
+PyYAML>=6.0,<7.0.0
+
+# Async runtime and utilities
+asyncio-mqtt>=0.16.0,<1.0.0
+httpx>=0.25.0,<1.0.0
+
+# MQTT integration for Home Assistant
+paho-mqtt>=2.0.0,<3.0.0
+
+# Image processing and computer vision
+opencv-python>=4.8.0,<5.0.0
+Pillow>=10.0.0,<11.0.0
+numpy>=1.24.0,<2.0.0
+
+# System monitoring and health checks
+psutil>=5.9.0,<6.0.0
+
+# AI provider dependencies  
+google-generativeai>=0.5.0,<1.0.0
+
+# Configuration and environment
+python-dotenv>=1.0.0,<2.0.0
+
+# Logging and structured output
+structlog>=23.2.0,<24.0.0
+
+# Development and testing dependencies
+pytest>=7.4.0,<8.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-cov>=4.1.0,<5.0.0
+black>=23.0.0,<24.0.0
+mypy>=1.5.0,<2.0.0
+flake8>=6.0.0,<7.0.0
+pre-commit>=3.5.0,<4.0.0
+
+# Optional dependencies for enhanced functionality
+# Uncomment as needed:
+# requests>=2.31.0,<3.0.0          # For non-async HTTP requests
+# tenacity>=8.2.0,<9.0.0           # For retry logic
+# cryptography>=41.0.0,<42.0.0     # For encryption features

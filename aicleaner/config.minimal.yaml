@@ -1,0 +1,15 @@
+# Minimal AI Cleaner Configuration
+# This is the simplest configuration to get started
+
+# Required: AI Provider
+gemini:
+  api_key: "your-gemini-api-key-here"
+
+# Optional: Override defaults as needed
+# processing:
+#   privacy_level: "fast"
+#   batch_size: 5
+
+# Optional: Disable Home Assistant integration
+# home_assistant:
+#   enabled: false

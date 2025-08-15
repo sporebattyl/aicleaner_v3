@@ -1,0 +1,68 @@
+MIT License
+
+Copyright (c) 2025 AICleaner Project Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Third-Party Dependencies
+
+This project includes and depends on several third-party libraries and services:
+
+### Python Libraries
+- google-generativeai: Apache License 2.0
+- paho-mqtt: Eclipse Public License 1.0
+- PyYAML: MIT License
+- aiofiles: Apache License 2.0
+- flask: BSD 3-Clause License
+- requests: Apache License 2.0
+- pydantic: MIT License
+- ollama: MIT License
+- fastapi: MIT License
+- uvicorn: BSD 3-Clause License
+
+### Home Assistant Integration
+- bashio: Apache License 2.0
+- Home Assistant Add-on Framework: Apache License 2.0
+
+### AI Services (Optional)
+- Google Gemini API: Subject to Google Cloud Terms of Service
+- OpenAI API: Subject to OpenAI Terms of Use
+- Anthropic Claude API: Subject to Anthropic Terms of Service
+
+### Docker Base Images
+- Home Assistant Base Images: Apache License 2.0
+- Alpine Linux: Various licenses (see Alpine Linux documentation)
+
+## Acknowledgments
+
+This project builds upon the excellent work of:
+- The Home Assistant community and core developers
+- The Python ecosystem and its maintainers
+- AI/ML providers who make powerful AI accessible
+- The open source community for tools and libraries used
+
+## Disclaimer
+
+This software is provided as-is for educational and personal use. Users are responsible for:
+- Compliance with AI service terms of use
+- Proper handling of personal data and privacy
+- Security of their Home Assistant installations
+- Costs associated with AI API usage
+
+The authors and contributors are not responsible for any costs, damages, or issues arising from the use of this software.

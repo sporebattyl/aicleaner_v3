@@ -1,0 +1,70 @@
+# AI Cleaner Configuration Example
+# Copy this file to config.yaml and customize for your environment
+
+# AI Provider Configuration
+gemini:
+  api_key: "your-gemini-api-key-here"  # Get from https://makersuite.google.com/app/apikey
+  model: "gemini-1.5-flash"            # Recommended: fast and cost-effective
+  max_retries: 3                       # Retry failed requests
+  timeout: 30                          # Request timeout in seconds
+
+# Uncomment when Ollama provider is implemented
+# ollama:
+#   base_url: "http://localhost:11434"   # Local Ollama server
+#   model: "llava"                       # Vision-capable model
+#   max_retries: 3
+#   timeout: 60
+
+# Provider Priority (failover order)
+provider_priority:
+  - gemini                             # Primary provider
+  # - ollama                           # Fallback provider
+
+# Processing Configuration
+processing:
+  privacy_level: "fast"                # Options: fast, balanced, thorough
+  batch_size: 10                       # Images processed in parallel
+  max_image_size_mb: 10.0              # Skip images larger than this
+  supported_formats:                   # Supported image formats
+    - jpg
+    - jpeg
+    - png
+    - gif
+    - bmp
+    - webp
+  # output_directory: "/backup/deleted"  # Optional: backup deleted images
+
+# Health Monitoring Configuration
+health:
+  check_interval: 60                   # Health check frequency (seconds)
+  max_failures: 3                      # Max failures before marking unhealthy
+  timeout: 10                          # Health check timeout
+
+# Logging Configuration
+logging:
+  level: "INFO"                        # DEBUG, INFO, WARNING, ERROR
+  # file_path: "/var/log/aicleaner.log" # Optional: log to file
+  max_file_size_mb: 10                 # Log rotation size
+  backup_count: 3                      # Number of backup log files
+
+# Home Assistant Integration
+home_assistant:
+  enabled: true                        # Enable MQTT integration
+  mqtt_host: "localhost"               # MQTT broker hostname
+  mqtt_port: 1883                      # MQTT broker port
+  # mqtt_username: "homeassistant"     # Optional: MQTT username
+  # mqtt_password: "your-password"     # Optional: MQTT password
+  device_name: "AI Cleaner"            # Device name in Home Assistant
+  discovery_topic: "homeassistant"     # Home Assistant discovery topic
+
+# Custom Analysis Prompt
+analysis_prompt: |
+  Analyze this image for photo collection cleanup. Consider:
+  1. Image quality (blurry, dark, overexposed)
+  2. Duplicate/similar content
+  3. Unwanted objects (screenshots, memes, accidental photos)
+  4. Personal value (people, pets, important events)
+  5. Artistic/aesthetic value
+
+  Delete low-quality, accidental, or duplicate images.
+  Keep meaningful photos with people, pets, or significant content.

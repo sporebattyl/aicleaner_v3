@@ -1,0 +1,127 @@
+# Production AI Cleaner Configuration
+# Optimized for production deployment with high reliability
+
+# AI Provider Configuration - Primary and Fallback
+gemini:
+  api_key: "${AICLEANER_GEMINI_API_KEY}"
+  model: "gemini-1.5-flash"
+  max_retries: 5
+  timeout: 45
+
+# Uncomment for Ollama fallback
+# ollama:
+#   base_url: "${AICLEANER_OLLAMA_URL:-http://localhost:11434}"
+#   model: "llava"
+#   max_retries: 3
+#   timeout: 120
+
+# Provider Priority (failover chain)
+provider_priority:
+  - gemini
+  # - ollama
+
+# Production Processing Settings
+processing:
+  privacy_level: "balanced"              # Good balance of speed and thoroughness
+  batch_size: 20                         # Higher throughput for production
+  max_image_size_mb: 50.0               # Handle larger images
+  concurrent_limit: 5                    # Limit concurrent API calls
+  supported_formats:
+    - jpg
+    - jpeg
+    - png
+    - gif
+    - bmp
+    - webp
+    - tiff
+    - raw
+  output_directory: "/data/backup/deleted"  # Backup deleted images
+  quarantine_directory: "/data/quarantine"  # Hold suspicious files
+
+# Robust Health Monitoring
+health:
+  check_interval: 30                     # More frequent health checks
+  max_failures: 5                        # More tolerance for transient failures
+  timeout: 15                           # Generous timeout
+  enable_detailed_metrics: true         # Detailed performance tracking
+
+# Production Logging
+logging:
+  level: "INFO"
+  file_path: "/var/log/aicleaner/aicleaner.log"
+  max_file_size_mb: 100                 # Larger log files
+  backup_count: 10                      # More log history
+  structured_logging: true              # JSON structured logs
+  log_rotation: "daily"                 # Daily log rotation
+  include_metrics: true                 # Include performance metrics
+
+# Home Assistant Integration with Security
+home_assistant:
+  enabled: true
+  mqtt_host: "${AICLEANER_MQTT_HOST:-localhost}"
+  mqtt_port: "${AICLEANER_MQTT_PORT:-1883}"
+  mqtt_username: "${AICLEANER_MQTT_USERNAME}"
+  mqtt_password: "${AICLEANER_MQTT_PASSWORD}"
+  mqtt_tls: true                        # Enable TLS encryption
+  mqtt_ca_cert: "/etc/ssl/certs/ca-certificates.crt"
+  device_name: "AI Cleaner Production"
+  discovery_topic: "homeassistant"
+  update_interval: 30                   # Status update frequency
+  enable_debug_entities: false          # Disable debug entities in production
+
+# Performance and Resource Management
+performance:
+  memory_limit_mb: 2048                 # Memory usage limit
+  enable_memory_monitoring: true        # Monitor memory usage
+  gc_threshold: 0.8                     # Garbage collection trigger
+  max_processing_time_minutes: 30       # Maximum time per batch
+  enable_cpu_throttling: true           # Prevent CPU overload
+  max_cpu_percent: 80                   # CPU usage limit
+
+# Security Settings
+security:
+  enable_rate_limiting: true            # Rate limit API calls
+  max_requests_per_minute: 100          # API rate limit
+  enable_input_validation: true         # Strict input validation
+  sanitize_file_paths: true             # Prevent path traversal
+  allowed_directories:                  # Restrict file access
+    - "/data/photos"
+    - "/backup/photos"
+    - "/import/photos"
+
+# Advanced Analysis Settings
+analysis:
+  enable_duplicate_detection: true      # Advanced duplicate detection
+  similarity_threshold: 0.85            # Similarity threshold for duplicates
+  enable_face_detection: true           # Detect faces for priority
+  enable_scene_analysis: true           # Analyze scene content
+  custom_rules_enabled: true            # Enable custom analysis rules
+  
+# Custom Analysis Prompt for Production
+analysis_prompt: |
+  Perform comprehensive image analysis for professional photo management:
+  
+  QUALITY ASSESSMENT:
+  - Technical quality: focus, exposure, noise, artifacts
+  - Composition: framing, lighting, aesthetic value
+  - Completeness: no truncated or corrupted areas
+  
+  CONTENT ANALYSIS:
+  - Human subjects: faces, people, social situations
+  - Important objects: pets, vehicles, buildings, documents
+  - Scene context: events, locations, activities
+  - Artistic merit: creative composition, interesting subjects
+  
+  REDUNDANCY CHECK:
+  - Near-duplicates from burst mode or similar shots
+  - Screenshots or captures of digital content
+  - Test shots or accidental captures
+  
+  DECISION CRITERIA:
+  DELETE: Poor quality (blurry, very dark, corrupted), obvious duplicates, 
+  accidental captures, screenshots of apps/memes, test photos
+  
+  KEEP: Clear photos with people/pets, unique moments, good quality landscapes,
+  important documents, artistic shots, anything with sentimental value
+  
+  Be conservative with deletion - when in doubt, keep the image.
